@@ -1,20 +1,23 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
-function required(name: string): string {
-  const value = process.env[name];
-  if (!value) throw new Error(`Missing required env var: ${name}`);
-  return value;
+function trimmedEnv(name: string): string | undefined {
+  const v = process.env[name];
+  if (typeof v !== "string") return undefined;
+  const t = v.trim();
+  return t.length ? t : undefined;
 }
 
 export function getSupabaseAdminClient(): SupabaseClient<any, "public", any> {
-  const url = required("NEXT_PUBLIC_SUPABASE_URL");
-  const serviceRoleKey = required("SUPABASE_SERVICE_ROLE_KEY");
+  const url = trimmedEnv("NEXT_PUBLIC_SUPABASE_URL");
+  const serviceRoleKey = trimmedEnv("SUPABASE_SERVICE_ROLE_KEY");
+  if (!url) throw new Error("Missing or empty env var: NEXT_PUBLIC_SUPABASE_URL");
+  if (!serviceRoleKey) throw new Error("Missing or empty env var: SUPABASE_SERVICE_ROLE_KEY");
   return createClient<any>(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
 }
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(trimmedEnv("NEXT_PUBLIC_SUPABASE_URL") && trimmedEnv("SUPABASE_SERVICE_ROLE_KEY"));
 }
 

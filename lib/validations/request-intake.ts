@@ -3,6 +3,18 @@ import { STATE_LGAS } from "@/lib/locations";
 
 export const REQUEST_INTAKE_STATE_VALUES = ["Lagos", "Ogun", "Oyo", "Osun"] as const;
 
+/** Portable http(s) check — `URL.canParse` is missing on some Node versions and can crash server actions. */
+function isProbablyHttpOrHttpsUrl(raw: string): boolean {
+  const s = raw.trim();
+  if (!s) return false;
+  try {
+    const u = new URL(s);
+    return u.protocol === "http:" || u.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
 const phoneLike = z
   .string()
   .trim()
@@ -67,7 +79,7 @@ function refineGeoAndProductRules(data: IntakeGeoProductFields, ctx: z.Refinemen
   }
 
   if (data.google_maps_link !== "") {
-    if (!URL.canParse(data.google_maps_link)) {
+    if (!isProbablyHttpOrHttpsUrl(data.google_maps_link)) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Must be a valid http(s) URL",
@@ -151,8 +163,9 @@ export const requestIntakeSchema = z
     document_names: z.array(z.string()).max(12).optional(),
     /** Bot protection fields */
     captcha_answer: z.string().trim().min(1, "Solve the CAPTCHA"),
-    captcha_expected: z.number().int(),
-    form_started_at: z.number().int(),
+    /** Coerce: server action JSON can stringify numbers in edge cases. */
+    captcha_expected: z.coerce.number().int(),
+    form_started_at: z.coerce.number().int(),
     website: z.string().optional(),
   })
   .superRefine((data, ctx) => {

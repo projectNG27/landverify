@@ -15,13 +15,28 @@ export type RequestIntakeActionResult =
 /**
  * Validates intake payload and inserts request when Supabase is configured.
  */
+function friendlyDbMessage(raw: string): string | undefined {
+  const m = raw.toLowerCase();
+  if (
+    m.includes("permission denied") ||
+    m.includes("row-level security") ||
+    m.includes("jwt") ||
+    m.includes("invalid api key")
+  ) {
+    return "Database rejected the request. In Vercel, use the Supabase service role key (not the anon key) for SUPABASE_SERVICE_ROLE_KEY.";
+  }
+  return undefined;
+}
+
 export async function submitRequestIntake(input: unknown): Promise<RequestIntakeActionResult> {
   const parsed = requestIntakeSchema.safeParse(input);
+
   if (!parsed.success) {
+    const first = parsed.error.issues[0];
     return {
       ok: false,
       fieldErrors: parsed.error.flatten().fieldErrors as Partial<Record<string, string[]>>,
-      message: "Please fix the highlighted fields.",
+      message: first?.message ?? "Please fix the highlighted fields.",
     };
   }
 
@@ -74,9 +89,13 @@ export async function submitRequestIntake(input: unknown): Promise<RequestIntake
     .single();
 
   if (insertError || !requestRow) {
+    console.error("submitRequestIntake insert failed", insertError);
+    const hint = insertError?.message ? friendlyDbMessage(insertError.message) : undefined;
     return {
       ok: false,
-      message: "We couldn't save your request right now. Please try again in a moment.",
+      message:
+        hint ??
+        "We couldn't save your request right now. Please try again in a moment. If this persists, check Vercel logs.",
     };
   }
 
