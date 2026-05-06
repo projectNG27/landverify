@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import dynamic from "next/dynamic";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { submitRequestIntake } from "@/app/actions/request-intake";
 import { STATE_LGAS, type SupportedState } from "@/lib/locations";
@@ -12,8 +12,8 @@ import {
   MAX_DOCUMENTS,
   MAX_FILE_BYTES,
   REQUEST_INTAKE_STATE_VALUES,
-  requestIntakeSchema,
-  type RequestIntakeValues,
+  createRequestIntakeClientSchema,
+  type RequestIntakeFormValues,
 } from "@/lib/validations/request-intake";
 
 const inputClass =
@@ -60,7 +60,7 @@ function validateFiles(files: FileList | null): { ok: true; names: string[] } | 
   return { ok: true, names };
 }
 
-const defaultValues: RequestIntakeValues = {
+const defaultValues: RequestIntakeFormValues = {
   full_name: "",
   email: "",
   phone: "",
@@ -77,8 +77,6 @@ const defaultValues: RequestIntakeValues = {
   consent: false,
   document_names: undefined,
   captcha_answer: "",
-  captcha_expected: 0,
-  form_started_at: 0,
   website: "",
 };
 
@@ -86,15 +84,25 @@ type RequestIntakeFormProps = {
   captchaA: number;
   captchaB: number;
   formStartedAt: number;
+  persistenceConfigured: boolean;
 };
 
-export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: RequestIntakeFormProps) {
+export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persistenceConfigured }: RequestIntakeFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previousStateRef = useRef<string>("");
   const [rootMessage, setRootMessage] = useState<string | null>(null);
   const [mapMessage, setMapMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<null | { mode: "preview" | "live"; requestId?: string }>(null);
   const [stateChangedNotice, setStateChangedNotice] = useState(false);
+
+  const clientSchema = useMemo(
+    () =>
+      createRequestIntakeClientSchema({
+        captchaSum: captchaA + captchaB,
+        formStartedAt,
+      }),
+    [captchaA, captchaB, formStartedAt],
+  );
 
   const {
     register,
@@ -105,8 +113,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
     setValue,
     watch,
     formState: { errors, isSubmitting },
-  } = useForm<RequestIntakeValues>({
-    resolver: zodResolver(requestIntakeSchema),
+  } = useForm<RequestIntakeFormValues>({
+    resolver: zodResolver(clientSchema),
     defaultValues,
   });
   const selectedState = watch("state");
@@ -130,12 +138,6 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
     }
     previousStateRef.current = selectedState;
   }, [selectedState, hasLocationSelected]);
-
-  useEffect(() => {
-    // Keep bot-guard fields in form state (hidden inputs can be stale with defaultValues alone).
-    setValue("captcha_expected", captchaA + captchaB, { shouldValidate: false });
-    setValue("form_started_at", formStartedAt, { shouldValidate: false });
-  }, [captchaA, captchaB, formStartedAt, setValue]);
 
   useEffect(() => {
     if (!selectedStateAsSupported) {
@@ -180,7 +182,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
     setMapMessage("Location reset. Pick a point for the selected state.");
   }
 
-  async function onSubmit(values: RequestIntakeValues) {
+  async function onSubmit(values: RequestIntakeFormValues) {
     setRootMessage(null);
     setSuccess(null);
     clearErrors();
@@ -210,7 +212,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
             continue;
           }
           if (msg) {
-            setError(key as keyof RequestIntakeValues, { message: msg });
+            setError(key as keyof RequestIntakeFormValues, { message: msg });
           }
         }
       }
@@ -650,9 +652,6 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
             ) : null}
           </div>
 
-          <input type="hidden" {...register("captcha_expected", { valueAsNumber: true })} />
-          <input type="hidden" {...register("form_started_at", { valueAsNumber: true })} />
-
           <div className="hidden" aria-hidden>
             <label htmlFor="website">Leave this field empty</label>
             <input id="website" tabIndex={-1} autoComplete="off" {...register("website")} />
@@ -667,7 +666,11 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
           >
             {isSubmitting ? "Checking…" : "Submit details"}
           </button>
-          <p className="text-xs text-[var(--lv-ink-faint)]">No data is stored until the database is connected.</p>
+          <p className="text-xs text-[var(--lv-ink-faint)]">
+            {persistenceConfigured
+              ? "Submitted requests are stored securely while we process your verification."
+              : "Database not configured on this server—contact will not persist until Supabase credentials are added."}
+          </p>
         </div>
       </form>
     </div>
