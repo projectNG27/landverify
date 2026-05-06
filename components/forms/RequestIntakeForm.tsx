@@ -93,7 +93,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
   const previousStateRef = useRef<string>("");
   const [rootMessage, setRootMessage] = useState<string | null>(null);
   const [mapMessage, setMapMessage] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
+  const [success, setSuccess] = useState<null | { mode: "preview" | "live"; requestId?: string }>(null);
   const [stateChangedNotice, setStateChangedNotice] = useState(false);
 
   const {
@@ -130,6 +130,12 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
     }
     previousStateRef.current = selectedState;
   }, [selectedState, hasLocationSelected]);
+
+  useEffect(() => {
+    // Keep bot-guard fields in form state (hidden inputs can be stale with defaultValues alone).
+    setValue("captcha_expected", captchaA + captchaB, { shouldValidate: false });
+    setValue("form_started_at", formStartedAt, { shouldValidate: false });
+  }, [captchaA, captchaB, formStartedAt, setValue]);
 
   useEffect(() => {
     if (!selectedStateAsSupported) {
@@ -176,7 +182,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
 
   async function onSubmit(values: RequestIntakeValues) {
     setRootMessage(null);
-    setSuccess(false);
+    setSuccess(null);
+    clearErrors();
 
     const fileCheck = validateFiles(fileInputRef.current?.files ?? null);
     if (!fileCheck.ok) {
@@ -198,6 +205,10 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
       if (result.fieldErrors) {
         for (const [key, msgs] of Object.entries(result.fieldErrors)) {
           const msg = msgs?.[0];
+          if (msg && key === "form_started_at") {
+            setRootMessage(msg);
+            continue;
+          }
           if (msg) {
             setError(key as keyof RequestIntakeValues, { message: msg });
           }
@@ -206,7 +217,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
       return;
     }
 
-    setSuccess(true);
+    setSuccess({ mode: result.mode, requestId: result.request_id });
     reset(defaultValues);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -220,8 +231,18 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
         >
           <p className="font-semibold">Details look good.</p>
           <p className="mt-1 text-green-800/90 dark:text-green-100/90">
-            Nothing has been saved yet—database connection comes next. You can submit another practice entry or keep
-            building your flow.
+            {success.mode === "live" ? (
+              <>
+                Your request has been saved. Tracking ID:{" "}
+                <span className="font-mono font-semibold text-green-900 dark:text-green-100">{success.requestId}</span>.
+                Keep this ID safe.
+              </>
+            ) : (
+              <>
+                Nothing has been saved yet—database connection comes next. You can submit another practice entry or keep
+                building your flow.
+              </>
+            )}
           </p>
         </div>
       ) : null}
@@ -629,8 +650,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt }: Request
             ) : null}
           </div>
 
-          <input type="hidden" value={captchaA + captchaB} {...register("captcha_expected", { valueAsNumber: true })} />
-          <input type="hidden" value={formStartedAt} {...register("form_started_at", { valueAsNumber: true })} />
+          <input type="hidden" {...register("captcha_expected", { valueAsNumber: true })} />
+          <input type="hidden" {...register("form_started_at", { valueAsNumber: true })} />
 
           <div className="hidden" aria-hidden>
             <label htmlFor="website">Leave this field empty</label>

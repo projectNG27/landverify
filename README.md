@@ -16,6 +16,26 @@ npm run typecheck  # TypeScript, no emit
 
 Copy `.env.example` to `.env.local` and fill values. Do not commit secrets.
 
+## Database (Supabase)
+
+Initial SQL schema lives at `supabase/schema.sql`.
+Incremental workflow migration for manager/agent phase 1 lives at `supabase/migrations/20260506_workflow_phase1.sql`.
+
+### Bootstrap steps
+
+1. Create a Supabase project.
+2. In Supabase SQL editor, run `supabase/schema.sql`.
+3. Set these env vars in `.env.local` (and your host):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+4. Restart the Next.js server.
+
+When these vars are configured, public intake saves real requests and tracking queries real statuses. Without them, both flows run in preview mode.
+
+### Agent auth env
+
+- `AGENT_AUTH_PEPPER` (optional but recommended): extra secret used when hashing agent passwords.
+
 ## GitHub Actions
 
 CI runs lint, typecheck, and build on pushes and pull requests to `main`.

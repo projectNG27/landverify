@@ -105,7 +105,7 @@ export const requestIntakeSchema = z
     if (Date.now() - data.form_started_at < 3000) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Submission too fast. Please try again.",
+        message: "Please wait at least 3 seconds after page load before submitting.",
         path: ["form_started_at"],
       });
     }

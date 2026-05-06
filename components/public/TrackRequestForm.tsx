@@ -8,15 +8,17 @@ import {
   trackRequestSchema,
   type TrackRequestInput,
 } from "@/lib/validations/track-request";
+import { timelineLabelFromStatus } from "@/lib/db/request-status";
 
 const inputClass =
   "w-full rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-3 text-[var(--lv-ink)] shadow-inner outline-none ring-[var(--lv-accent)] placeholder:text-[var(--lv-ink-faint)] focus:border-[var(--lv-primary)] focus:ring-2 disabled:opacity-60";
 
 const STEPS = [
   { key: "received", label: "Request received", detail: "We have your submission on file." },
-  { key: "payment", label: "Payment", detail: "Invoice paid or pending." },
-  { key: "verification", label: "Verification", detail: "Desktop review and registry checks." },
-  { key: "report", label: "Report ready", detail: "Digest delivered by email." },
+  { key: "assigned", label: "Assigned", detail: "A manager assigns your request to an agent." },
+  { key: "progress", label: "In progress", detail: "Verification and review are ongoing." },
+  { key: "ready", label: "Report ready", detail: "Final report is prepared for delivery." },
+  { key: "completed", label: "Completed", detail: "Report has been sent and case completed." },
 ] as const;
 
 function TimelinePreview({ activeIndex }: { activeIndex: number }) {
@@ -50,6 +52,15 @@ function TimelinePreview({ activeIndex }: { activeIndex: number }) {
   );
 }
 
+function formatHistoryWhen(iso: string) {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  return new Intl.DateTimeFormat("en-NG", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(d);
+}
+
 export function TrackRequestForm() {
   const [result, setResult] = useState<TrackRequestActionResult | null>(null);
   const [serverMessage, setServerMessage] = useState<string | null>(null);
@@ -69,6 +80,9 @@ export function TrackRequestForm() {
   }
 
   const previewOk = result?.ok === true && result.mode === "preview";
+  const liveOk = result?.ok === true && result.mode === "live";
+  const activeIndex = liveOk ? (result.timeline_index ?? 0) : 1;
+  const history = liveOk && result.history && result.history.length > 0 ? result.history : null;
 
   return (
     <div className="mx-auto max-w-lg">
@@ -145,18 +159,51 @@ export function TrackRequestForm() {
         </button>
       </form>
 
-      {previewOk && (
+      {(previewOk || liveOk) && (
         <div className="mt-8 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-card)] p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">Status preview</p>
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">
+            {liveOk ? "Current status" : "Status preview"}
+          </p>
           <p className="mt-2 text-sm text-[var(--lv-ink-muted)]">
-            We recognised <span className="font-mono text-[var(--lv-ink)]">{result.request_id}</span> with{" "}
-            <span className="font-medium text-[var(--lv-ink)]">{result.email_hint}</span>. Detailed payment and
-            verification stages will show here once tracking is fully online.
+            {liveOk ? (
+              <>
+                Request <span className="font-mono text-[var(--lv-ink)]">{result.request_id}</span> matched{" "}
+                <span className="font-medium text-[var(--lv-ink)]">{result.email_hint}</span>.{" "}
+                {result.timeline_detail ?? "Your latest status is available below."}
+              </>
+            ) : (
+              <>
+                We recognised <span className="font-mono text-[var(--lv-ink)]">{result.request_id}</span> with{" "}
+                <span className="font-medium text-[var(--lv-ink)]">{result.email_hint}</span>. Detailed payment and
+                verification stages will show here once tracking is fully online.
+              </>
+            )}
           </p>
-          <p className="mt-3 text-xs text-[var(--lv-ink-faint)]">
-            Below is a sample timeline — your actual step may differ once we record your request in our systems.
-          </p>
-          <TimelinePreview activeIndex={1} />
+          {!liveOk && (
+            <p className="mt-3 text-xs text-[var(--lv-ink-faint)]">
+              Below is a sample timeline — your actual step may differ once we record your request in our systems.
+            </p>
+          )}
+          <TimelinePreview activeIndex={activeIndex} />
+          {history ? (
+            <div className="mt-8 border-t border-[var(--lv-border)] pt-6">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">Activity log</p>
+              <ol className="mt-3 space-y-3">
+                {history.map((entry, idx) => (
+                  <li
+                    key={`${entry.created_at}-${idx}`}
+                    className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-muted)]/30 px-3 py-2 text-sm"
+                  >
+                    <p className="font-semibold text-[var(--lv-ink)]">{timelineLabelFromStatus(entry.status)}</p>
+                    <p className="mt-0.5 text-xs text-[var(--lv-ink-faint)]">{formatHistoryWhen(entry.created_at)}</p>
+                    {entry.note ? (
+                      <p className="mt-2 text-xs leading-relaxed text-[var(--lv-ink-muted)]">{entry.note}</p>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </div>
+          ) : null}
         </div>
       )}
     </div>

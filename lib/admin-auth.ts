@@ -4,8 +4,11 @@ import { cookies } from "next/headers";
 const SESSION_COOKIE = "lv_admin_session";
 const MAX_AGE_SECONDS = 60 * 60 * 12; // 12 hours
 
+export type SessionRole = "manager" | "agent";
+
 type SessionPayload = {
   sub: string;
+  role: SessionRole;
   exp: number;
 };
 
@@ -46,7 +49,7 @@ function parseAndVerifyToken(token: string, secret: string): SessionPayload | nu
   if (!timingSafeEqual(provided, expected)) return null;
   try {
     const payload = JSON.parse(base64UrlDecode(encodedPayload)) as SessionPayload;
-    if (!payload?.sub || !payload?.exp) return null;
+    if (!payload?.sub || !payload?.exp || (payload.role !== "manager" && payload.role !== "agent")) return null;
     if (Date.now() / 1000 >= payload.exp) return null;
     return payload;
   } catch {
@@ -63,7 +66,21 @@ export function validateAdminCredentials(username: string, password: string): bo
 export async function setAdminSession(username: string) {
   const secret = getRequiredEnv("ADMIN_SESSION_SECRET");
   const exp = Math.floor(Date.now() / 1000) + MAX_AGE_SECONDS;
-  const token = buildToken({ sub: username, exp }, secret);
+  const token = buildToken({ sub: username, role: "manager", exp }, secret);
+  const store = await cookies();
+  store.set(SESSION_COOKIE, token, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: MAX_AGE_SECONDS,
+  });
+}
+
+export async function setAgentSession(username: string) {
+  const secret = getRequiredEnv("ADMIN_SESSION_SECRET");
+  const exp = Math.floor(Date.now() / 1000) + MAX_AGE_SECONDS;
+  const token = buildToken({ sub: username, role: "agent", exp }, secret);
   const store = await cookies();
   store.set(SESSION_COOKIE, token, {
     httpOnly: true,
@@ -80,12 +97,24 @@ export async function clearAdminSession() {
 }
 
 export async function getAdminSessionUser(): Promise<string | null> {
+  const session = await getSession();
+  if (!session || session.role !== "manager") return null;
+  return session.sub;
+}
+
+export async function getAgentSessionUser(): Promise<string | null> {
+  const session = await getSession();
+  if (!session || session.role !== "agent") return null;
+  return session.sub;
+}
+
+export async function getSession(): Promise<{ sub: string; role: SessionRole } | null> {
   const secret = process.env.ADMIN_SESSION_SECRET;
   if (!secret) return null;
   const store = await cookies();
   const token = store.get(SESSION_COOKIE)?.value;
   if (!token) return null;
   const payload = parseAndVerifyToken(token, secret);
-  return payload?.sub ?? null;
+  return payload ? { sub: payload.sub, role: payload.role } : null;
 }
 

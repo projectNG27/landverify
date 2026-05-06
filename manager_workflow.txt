@@ -1,0 +1,221 @@
+I need you to implement this work-management system in phases. Do not build everything at once. Build cleanly, test each phase, and keep the workflow scalable.
+
+PROJECT GOAL
+Create a full manager and agent workflow system for public land/service verification requests.
+
+The system should support:
+- Public request tracking
+- Manager login and dashboard
+- Agent login and dedicated task dashboard
+- Request assignment
+- Deadline tracking based on request tier
+- Agent result submission
+- Manager review and approval
+- Automated report generation
+- Email notification when report is ready
+- Case-by-case messaging between agent and manager
+
+PHASE 1 — Authentication and Roles
+Implement secure login with roles:
+- Manager
+- Agent
+
+Requirements:
+- Managers can access the full management dashboard.
+- Agents can only access their own assigned tasks.
+- Public users do not need login for tracking; they track using request ID.
+
+PHASE 2 — Request Management Dashboard
+Create a manager dashboard where the manager can see all submitted public requests.
+
+Each request should show:
+- Unique human-readable request ID
+- Applicant/request summary
+- Tier type
+- Payment status
+- Current status
+- Assigned agent name if assigned
+- Date submitted
+- Deadline / remaining time
+
+The manager should be able to click any request and open a full request report page, not just view it as a list.
+
+PHASE 3 — Request Detail / Report Page
+Create a detailed request page for the manager.
+
+This page should show:
+- Full submitted request information
+- Required documents
+- Location information
+- Payment status
+- Tier type
+- Deadline
+- Assigned agent
+- Current status
+- Agent submitted findings/result section
+- Internal manager-agent messages for that specific request
+
+PHASE 4 — Assignment Workflow
+Allow the manager to assign a request to an individual agent.
+
+When assigned:
+- Request status changes to “Assigned”
+- Assigned agent name appears on manager dashboard
+- Task appears in the assigned agent’s queue
+- Agent must confirm the task as received
+
+Agent confirmation:
+- When agent confirms, status changes to “In Progress”
+- The task moves into the agent’s “In Progress” queue
+
+PHASE 5 — Tier-Based Deadline Automation
+Each request tier should have a defined number of days required for completion.
+
+Implement deadline logic:
+- Deadline is calculated based on tier type and assignment/received date
+- Show remaining days or hours
+- When the request is within 48 hours of deadline, show remaining time in red
+- If overdue, clearly mark as overdue
+
+PHASE 6 — Agent Web App / Agent Dashboard
+Create a dedicated agent dashboard.
+
+Agents should only see:
+- Request ID
+- Request details needed for work
+- Required documents
+- Location information
+
+Important:
+- Do not expose customer name to agents.
+- Agents should work only with request ID and task information.
+- Agents must not see requests assigned to other agents.
+
+Agent queues:
+- New Assigned Tasks
+- In Progress Tasks
+- Report Submitted Tasks
+- Completed/Closed Tasks if needed
+
+PHASE 7 — Agent Result Submission
+For each assigned task, the agent should be able to submit findings/results.
+
+The result form should be tied directly to the request ID to prevent mix-ups.
+
+Agent should be able to:
+- Open a task
+- Review request details
+- Submit findings
+- Upload supporting notes/files if needed
+- Mark as “Report Submitted”
+
+Once submitted:
+- Task remains in agent completed/submitted queue
+- Manager sees the result on the request report page
+- Status changes to “Report Submitted” or “Pending Manager Review”
+
+PHASE 8 — Manager Review and Automated Report Generation
+Manager should review the agent’s submitted findings.
+
+After review:
+- System uses the request tier and report template to generate the final report
+- Status changes to “Report Ready”
+- Manager can preview the generated report
+- Manager can approve and send it
+
+Do not automatically send the report without manager approval.
+
+PHASE 9 — Customer Notification and Public Tracking
+When manager clicks “Send”:
+- System sends email to the public/customer
+- Email should say the report is available for the request ID
+- Do not expose internal workflow details
+
+Public tracking statuses:
+- Received
+- Assigned
+- In Progress
+- Report Ready
+- Completed
+
+Use clean, user-friendly status labels.
+
+PHASE 10 — Case-by-Case Messaging
+Create internal messaging between manager and agent per request.
+
+Requirements:
+- Agent can send a message to manager for a specific request
+- Manager can reply on that same request
+- Messages should stay attached to that request only
+- Show unread indicators if possible
+
+PHASE 11 — Final Manager Closure
+After manager sends the report:
+- Manager can mark task as “Done”
+- Once marked Done, it should drop off active agent queues
+- It should remain available in completed history for audit/reporting
+
+AUTOMATION IMPROVEMENTS
+Add automation where appropriate:
+- Auto-generate request ID
+- Auto-calculate deadline
+- Auto-update status based on actions
+- Auto-highlight urgent/overdue tasks
+- Auto-notify manager when agent submits report
+- Auto-generate report draft from template
+- Auto-email customer only after manager approval
+
+DATA MODEL NEEDED
+Create or update database tables/models for:
+- Users
+- Roles
+- Requests
+- Request documents
+- Assignments
+- Agent results
+- Report templates
+- Generated reports
+- Internal messages
+- Status history / audit log
+
+IMPORTANT WORKFLOW STATES
+Use these statuses:
+1. Received
+2. Assigned
+3. In Progress
+4. Report Submitted
+5. Pending Manager Review
+6. Report Ready
+7. Completed
+8. Done
+9. Overdue where applicable
+
+SECURITY RULES
+- Manager can view and manage all requests.
+- Agent can only view assigned requests.
+- Agent must not see customer name.
+- Public users can only track by request ID.
+- Sensitive documents should be protected.
+- Every major action should be logged.
+
+UI EXPECTATION
+Make the system feel like a professional work-management dashboard, not just a basic table.
+
+Manager dashboard should include:
+- Total requests
+- Paid requests
+- Pending assignment
+- In progress
+- Awaiting review
+- Report ready
+- Overdue
+- Agent workload summary
+
+Agent dashboard should include:
+- Assigned tasks
+- In-progress tasks
+- Submitted reports
+- Messages from manager
+- Deadlines and urgency indicator
+
+Build this phase by phase. Start with the database structure, roles, request status workflow, and manager dashboard first.

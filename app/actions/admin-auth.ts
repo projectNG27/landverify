@@ -24,7 +24,7 @@ export async function adminLoginAction(_: AdminAuthState, formData: FormData): P
       error: error instanceof Error ? error.message : "Unable to sign in right now.",
     };
   }
-  redirect("/admin/blog/new");
+  redirect("/admin");
 }
 
 export async function adminLogoutAction() {

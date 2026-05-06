@@ -43,6 +43,15 @@ export default async function AdminNewBlogPostPage() {
         <AdminPublishPostForm />
       </div>
 
+      <div className="mt-6 flex flex-wrap gap-4 text-sm font-semibold text-[var(--lv-primary)]">
+        <Link href="/admin" className="hover:underline">
+          ← Admin home
+        </Link>
+        <Link href="/admin/requests" className="hover:underline">
+          Update request status
+        </Link>
+      </div>
+
       <Link href="/blog" className="mt-6 inline-block text-sm font-semibold text-[var(--lv-primary)] hover:underline">
         View public insights
       </Link>
