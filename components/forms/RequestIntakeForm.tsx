@@ -3,7 +3,7 @@
 import { zodResolver } from "@hookform/resolvers/zod";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useForm } from "react-hook-form";
+import { type FieldErrors, useForm } from "react-hook-form";
 import { submitRequestIntake } from "@/app/actions/request-intake";
 import { STATE_LGAS, type SupportedState } from "@/lib/locations";
 import { PRODUCTS } from "@/lib/products";
@@ -182,6 +182,20 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
     setMapMessage("Location reset. Pick a point for the selected state.");
   }
 
+  function onInvalid(errorsMap: FieldErrors<RequestIntakeFormValues>) {
+    const firstErrorField = Object.keys(errorsMap)[0] as keyof RequestIntakeFormValues | undefined;
+    if (!firstErrorField) return;
+    const key = String(firstErrorField);
+    setRootMessage(`Please check "${key.replaceAll("_", " ")}" and try again.`);
+    const el = document.getElementById(key);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
+        el.focus();
+      }
+    }
+  }
+
   async function onSubmit(values: RequestIntakeFormValues) {
     setRootMessage(null);
     setSuccess(null);
@@ -255,7 +269,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
         </div>
       ) : null}
 
-      <form className="space-y-10" onSubmit={handleSubmit(onSubmit)} noValidate>
+      <form className="space-y-10" onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate>
         <fieldset className="space-y-4 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-6 shadow-sm">
           <legend className="px-1 text-lg font-semibold text-[var(--lv-ink)]">Your contact details</legend>
 
