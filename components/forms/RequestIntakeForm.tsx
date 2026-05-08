@@ -2,7 +2,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import dynamic from "next/dynamic";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { type FieldErrors, useForm } from "react-hook-form";
 import { submitRequestIntake } from "@/app/actions/request-intake";
 import { STATE_LGAS, type SupportedState } from "@/lib/locations";
@@ -12,7 +12,8 @@ import {
   MAX_DOCUMENTS,
   MAX_FILE_BYTES,
   REQUEST_INTAKE_STATE_VALUES,
-  createRequestIntakeClientSchema,
+  parseCaptchaAnswerDigits,
+  requestIntakeClientResolverSchema,
   type RequestIntakeFormValues,
 } from "@/lib/validations/request-intake";
 
@@ -90,19 +91,23 @@ type RequestIntakeFormProps = {
 export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persistenceConfigured }: RequestIntakeFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previousStateRef = useRef<string>("");
+  /** Monotonic time at first client mount — used for the “wait 3s” rule (no client/server clock skew). */
+  const pageOpenPerfRef = useRef<number | null>(null);
+  /** Client wall time at mount — sent to the server for a loose time check. */
+  const pageOpenMsRef = useRef<number>(0);
   const [rootMessage, setRootMessage] = useState<string | null>(null);
   const [mapMessage, setMapMessage] = useState<string | null>(null);
   const [success, setSuccess] = useState<null | { mode: "preview" | "live"; requestId?: string }>(null);
   const [stateChangedNotice, setStateChangedNotice] = useState(false);
 
-  const clientSchema = useMemo(
-    () =>
-      createRequestIntakeClientSchema({
-        captchaSum: captchaA + captchaB,
-        formStartedAt,
-      }),
-    [captchaA, captchaB, formStartedAt],
-  );
+  useEffect(() => {
+    if (typeof performance !== "undefined" && pageOpenPerfRef.current === null) {
+      pageOpenPerfRef.current = performance.now();
+    }
+    if (pageOpenMsRef.current === 0) {
+      pageOpenMsRef.current = Date.now();
+    }
+  }, []);
 
   const {
     register,
@@ -114,7 +119,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
     watch,
     formState: { errors, isSubmitting },
   } = useForm<RequestIntakeFormValues>({
-    resolver: zodResolver(clientSchema),
+    resolver: zodResolver(requestIntakeClientResolverSchema),
     defaultValues,
   });
   const selectedState = watch("state");
@@ -201,6 +206,19 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
     setSuccess(null);
     clearErrors();
 
+    const expectedSum = captchaA + captchaB;
+    const captchaParsed = parseCaptchaAnswerDigits(values.captcha_answer);
+    if (captchaParsed !== expectedSum) {
+      setError("captcha_answer", { message: "Incorrect CAPTCHA answer" });
+      return;
+    }
+
+    const openPerf = pageOpenPerfRef.current;
+    if (openPerf != null && typeof performance !== "undefined" && performance.now() - openPerf < 2500) {
+      setRootMessage("Please wait at least 3 seconds after the page loads before submitting.");
+      return;
+    }
+
     const fileCheck = validateFiles(fileInputRef.current?.files ?? null);
     if (!fileCheck.ok) {
       setRootMessage(fileCheck.message);
@@ -210,8 +228,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
     const payload = {
       ...values,
       document_names: fileCheck.names.length ? fileCheck.names : undefined,
-      captcha_expected: captchaA + captchaB,
-      form_started_at: formStartedAt,
+      captcha_expected: expectedSum,
+      form_started_at: pageOpenMsRef.current > 0 ? pageOpenMsRef.current : formStartedAt,
     };
 
     const result = await submitRequestIntake(payload);

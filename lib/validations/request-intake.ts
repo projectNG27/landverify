@@ -100,43 +100,30 @@ function refineGeoAndProductRules(data: IntakeGeoProductFields, ctx: z.Refinemen
   }
 }
 
-/**
- * Browser-only schema: binds CAPTCHA and timing to server-rendered props so validation does not rely on
- * hidden inputs (those can remain 0 in production and falsely fail against the displayed numbers).
- */
-export function createRequestIntakeClientSchema(opts: {
-  captchaSum: number;
-  formStartedAt: number;
-}) {
-  return requestIntakeFormFields.superRefine((data, ctx) => {
-    refineGeoAndProductRules(data, ctx);
-
-    const answer = Number.parseInt(data.captcha_answer, 10);
-    if (!Number.isFinite(answer) || answer !== opts.captchaSum) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Incorrect CAPTCHA answer",
-        path: ["captcha_answer"],
-      });
-    }
-
-    if (data.website && data.website.trim() !== "") {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Bot submission blocked",
-        path: ["website"],
-      });
-    }
-
-    if (Date.now() - opts.formStartedAt < 3000) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Please wait at least 3 seconds after page load before submitting.",
-        path: ["form_started_at"],
-      });
-    }
-  });
+/** Strip non-digits so mobile keyboards and pasted text still validate (e.g. "9", " 9 ", "９"). */
+export function parseCaptchaAnswerDigits(raw: string): number | null {
+  const digits = raw.normalize("NFKC").replace(/\D/g, "");
+  if (!digits) return null;
+  const n = Number.parseInt(digits, 10);
+  return Number.isFinite(n) ? n : null;
 }
+
+/**
+ * Client-side resolver: fields + geography + honeypot only.
+ * CAPTCHA and “submit delay” checks run in the submit handler so we never rely on a resolver closure
+ * that can go stale after navigation or hydration, and timing uses `performance.now()` (no clock skew).
+ */
+export const requestIntakeClientResolverSchema = requestIntakeFormFields.superRefine((data, ctx) => {
+  refineGeoAndProductRules(data, ctx);
+
+  if (data.website && data.website.trim() !== "") {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Bot submission blocked",
+      path: ["website"],
+    });
+  }
+});
 
 export type RequestIntakeFormValues = z.infer<typeof requestIntakeFormFields>;
 
@@ -171,8 +158,8 @@ export const requestIntakeSchema = z
   .superRefine((data, ctx) => {
     refineGeoAndProductRules(data, ctx);
 
-    const answer = Number.parseInt(data.captcha_answer, 10);
-    if (!Number.isFinite(answer) || answer !== data.captcha_expected) {
+    const answer = parseCaptchaAnswerDigits(data.captcha_answer);
+    if (answer === null || answer !== data.captcha_expected) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
         message: "Incorrect CAPTCHA answer",
@@ -188,11 +175,12 @@ export const requestIntakeSchema = z
       });
     }
 
-    // Time trap: block very fast submissions (<3s) common in scripted form posts.
-    if (Date.now() - data.form_started_at < 3000) {
+    // Time trap on server wall clock — ignore negative deltas (client clock ahead of server).
+    const elapsedMs = Date.now() - data.form_started_at;
+    if (elapsedMs >= 0 && elapsedMs < 2500) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,
-        message: "Please wait at least 3 seconds after page load before submitting.",
+        message: "Please wait a moment after the page loads before submitting.",
         path: ["form_started_at"],
       });
     }
