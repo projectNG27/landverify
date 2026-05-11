@@ -41,7 +41,6 @@ export default function SubmitRequestPage() {
 
       <div className="mt-10">
         <RequestIntakeForm
-          key={`${captchaA}-${captchaB}-${formStartedAt}`}
           captchaA={captchaA}
           captchaB={captchaB}
           formStartedAt={formStartedAt}

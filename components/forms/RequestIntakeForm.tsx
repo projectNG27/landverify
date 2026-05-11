@@ -2,9 +2,11 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { type FieldErrors, useForm } from "react-hook-form";
 import { submitRequestIntake } from "@/app/actions/request-intake";
+import { RequestIntakeSuccess } from "@/components/forms/RequestIntakeSuccess";
 import { STATE_LGAS, type SupportedState } from "@/lib/locations";
 import { PRODUCTS } from "@/lib/products";
 import {
@@ -97,7 +99,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
   const pageOpenMsRef = useRef<number>(0);
   const [rootMessage, setRootMessage] = useState<string | null>(null);
   const [mapMessage, setMapMessage] = useState<string | null>(null);
-  const [success, setSuccess] = useState<null | { mode: "preview" | "live"; requestId?: string }>(null);
+  const router = useRouter();
+  const [success, setSuccess] = useState<null | { mode: "preview" | "live"; requestId?: string; email: string }>(null);
   const [stateChangedNotice, setStateChangedNotice] = useState(false);
 
   useEffect(() => {
@@ -161,6 +164,21 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
       clearErrors("lga");
     }
   }, [clearErrors, selectedStateAsSupported, selectedLga, setValue]);
+
+  useEffect(() => {
+    if (!success) return;
+    window.requestAnimationFrame(() => {
+      document.getElementById("intake-success-panel")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }, [success]);
+
+  function handleSubmitAnother() {
+    setSuccess(null);
+    setRootMessage(null);
+    reset(defaultValues);
+    if (fileInputRef.current) fileInputRef.current.value = "";
+    router.refresh();
+  }
 
   function handleMapPick(point: { lat: number; lng: number }, displayAddress?: string) {
     const coordinatesText = `${point.lat.toFixed(6)}, ${point.lng.toFixed(6)}`;
@@ -251,7 +269,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
       return;
     }
 
-    setSuccess({ mode: result.mode, requestId: result.request_id });
+    const submittedEmail = values.email.trim();
+    setSuccess({ mode: result.mode, requestId: result.request_id, email: submittedEmail });
     reset(defaultValues);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }
@@ -259,26 +278,12 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
   return (
     <div className="space-y-8">
       {success ? (
-        <div
-          className="rounded-xl border border-green-600/30 bg-green-50 px-4 py-3 text-sm text-green-900 dark:bg-green-950/40 dark:text-green-100"
-          role="status"
-        >
-          <p className="font-semibold">Details look good.</p>
-          <p className="mt-1 text-green-800/90 dark:text-green-100/90">
-            {success.mode === "live" ? (
-              <>
-                Your request has been saved. Tracking ID:{" "}
-                <span className="font-mono font-semibold text-green-900 dark:text-green-100">{success.requestId}</span>.
-                Keep this ID safe.
-              </>
-            ) : (
-              <>
-                Nothing has been saved yet—database connection comes next. You can submit another practice entry or keep
-                building your flow.
-              </>
-            )}
-          </p>
-        </div>
+        <RequestIntakeSuccess
+          mode={success.mode}
+          requestId={success.requestId}
+          email={success.email}
+          onSubmitAnother={handleSubmitAnother}
+        />
       ) : null}
 
       {rootMessage ? (
@@ -287,6 +292,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
         </div>
       ) : null}
 
+      {success ? null : (
       <form className="space-y-10" onSubmit={handleSubmit(onSubmit, onInvalid)} noValidate>
         <fieldset className="space-y-4 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-6 shadow-sm">
           <legend className="px-1 text-lg font-semibold text-[var(--lv-ink)]">Your contact details</legend>
@@ -705,6 +711,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
           </p>
         </div>
       </form>
+      )}
     </div>
   );
 }
