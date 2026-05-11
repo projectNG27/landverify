@@ -7,14 +7,15 @@ function trimmedEnv(name: string): string | undefined {
   return t.length ? t : undefined;
 }
 
-export function getSupabaseAdminClient(): SupabaseClient<any, "public", any> {
+/** Untyped DB until `supabase gen types` is wired. */
+export function getSupabaseAdminClient(): SupabaseClient {
   const url = trimmedEnv("NEXT_PUBLIC_SUPABASE_URL");
   const serviceRoleKey = trimmedEnv("SUPABASE_SERVICE_ROLE_KEY");
   if (!url) throw new Error("Missing or empty env var: NEXT_PUBLIC_SUPABASE_URL");
   if (!serviceRoleKey) throw new Error("Missing or empty env var: SUPABASE_SERVICE_ROLE_KEY");
-  return createClient<any>(url, serviceRoleKey, {
+  return createClient(url, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
-  });
+  }) as SupabaseClient;
 }
 
 export function isSupabaseConfigured(): boolean {

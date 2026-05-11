@@ -14,6 +14,9 @@ export const metadata: Metadata = {
 
 type Props = { params: Promise<{ requestCode: string }> };
 
+type AgentFindingRow = { section_key: string; findings: string; updated_at?: string };
+type RequestMessageRow = { sender_role: string; sender_name: string; message: string; created_at: string };
+
 export default async function AgentTaskPage({ params }: Props) {
   const username = await getAgentSessionUser();
   if (!username) redirect("/agent/login");
@@ -33,7 +36,7 @@ export default async function AgentTaskPage({ params }: Props) {
     .maybeSingle();
   if (!request || request.assigned_agent_id !== agent.id) notFound();
 
-  const [{ data: findings }, { data: messages }] = await Promise.all([
+  const [{ data: findingsRaw }, { data: messagesRaw }] = await Promise.all([
     supabase
       .from("agent_findings")
       .select("section_key, findings, updated_at")
@@ -45,6 +48,9 @@ export default async function AgentTaskPage({ params }: Props) {
       .eq("request_id", request.id)
       .order("created_at", { ascending: true }),
   ]);
+
+  const findings = (findingsRaw ?? []) as AgentFindingRow[];
+  const messages = (messagesRaw ?? []) as RequestMessageRow[];
 
   const remain = formatRemaining(request.sla_due_at);
 
@@ -108,9 +114,9 @@ export default async function AgentTaskPage({ params }: Props) {
         </section>
         <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Submitted findings</h2>
-          {findings && findings.length > 0 ? (
+          {findings.length > 0 ? (
             <ul className="mt-3 space-y-3">
-              {findings.map((f: any, idx: number) => (
+              {findings.map((f, idx) => (
                 <li key={`${f.section_key}-${idx}`} className="rounded-lg border border-[var(--lv-border)] p-3 text-sm">
                   <p className="font-semibold text-[var(--lv-ink)]">{f.section_key}</p>
                   <p className="mt-1 text-[var(--lv-ink-muted)]">{f.findings}</p>
@@ -125,9 +131,9 @@ export default async function AgentTaskPage({ params }: Props) {
 
       <section className="mt-6 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Case messages</h2>
-        {messages && messages.length > 0 ? (
+        {messages.length > 0 ? (
           <ul className="mt-3 space-y-3">
-            {messages.map((m: any, idx: number) => (
+            {messages.map((m, idx) => (
               <li key={`${m.created_at}-${idx}`} className="rounded-lg border border-[var(--lv-border)] p-3 text-sm">
                 <p className="font-semibold text-[var(--lv-ink)]">
                   {m.sender_name} <span className="font-normal text-[var(--lv-ink-faint)]">({m.sender_role})</span>

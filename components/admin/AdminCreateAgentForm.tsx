@@ -16,22 +16,30 @@ export function AdminCreateAgentForm() {
       <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Create agent account</h2>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="text-xs font-medium text-[var(--lv-ink)]">Full name</label>
-          <input className={inputClass} name="full_name" required />
+          <label htmlFor="agent_full_name" className="text-xs font-medium text-[var(--lv-ink)]">
+            Full name
+          </label>
+          <input id="agent_full_name" className={inputClass} name="full_name" required />
         </div>
         <div>
-          <label className="text-xs font-medium text-[var(--lv-ink)]">Username</label>
-          <input className={inputClass} name="username" autoComplete="off" required />
+          <label htmlFor="agent_username" className="text-xs font-medium text-[var(--lv-ink)]">
+            Username
+          </label>
+          <input id="agent_username" className={inputClass} name="username" autoComplete="off" required />
         </div>
       </div>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>
-          <label className="text-xs font-medium text-[var(--lv-ink)]">Email</label>
-          <input className={inputClass} name="email" type="email" required />
+          <label htmlFor="agent_email" className="text-xs font-medium text-[var(--lv-ink)]">
+            Email
+          </label>
+          <input id="agent_email" className={inputClass} name="email" type="email" required />
         </div>
         <div>
-          <label className="text-xs font-medium text-[var(--lv-ink)]">Temp password</label>
-          <input className={inputClass} name="password" type="text" minLength={8} required />
+          <label htmlFor="agent_temp_password" className="text-xs font-medium text-[var(--lv-ink)]">
+            Temp password
+          </label>
+          <input id="agent_temp_password" className={inputClass} name="password" type="text" minLength={8} required />
         </div>
       </div>
       {state.error ? <p className="text-xs text-red-600">{state.error}</p> : null}

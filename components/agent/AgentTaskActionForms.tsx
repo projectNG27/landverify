@@ -37,19 +37,23 @@ export function AgentFindingsForm({ requestCode }: { requestCode: string }) {
       <input type="hidden" name="request_code" value={requestCode} />
       <div className="grid gap-2 sm:grid-cols-2">
         <div>
-          <label className="text-xs font-medium text-[var(--lv-ink)]">Section key</label>
-          <input name="section_key" className={inputClass} placeholder="e.g. documents" required />
+          <label htmlFor="section_key" className="text-xs font-medium text-[var(--lv-ink)]">
+            Section key
+          </label>
+          <input id="section_key" name="section_key" className={inputClass} placeholder="e.g. documents" required />
         </div>
         <div className="flex items-end">
-          <label className="inline-flex items-center gap-2 text-xs text-[var(--lv-ink-muted)]">
-            <input type="checkbox" name="mark_submitted" value="1" />
-            Mark report submitted
-          </label>
+          <span className="inline-flex items-center gap-2 text-xs text-[var(--lv-ink-muted)]">
+            <input id="mark_submitted" type="checkbox" name="mark_submitted" value="1" />
+            <label htmlFor="mark_submitted">Mark report submitted</label>
+          </span>
         </div>
       </div>
       <div>
-        <label className="text-xs font-medium text-[var(--lv-ink)]">Findings</label>
-        <textarea name="findings" rows={5} className={`${inputClass} mt-1`} required />
+        <label htmlFor="findings" className="text-xs font-medium text-[var(--lv-ink)]">
+          Findings
+        </label>
+        <textarea id="findings" name="findings" rows={5} className={`${inputClass} mt-1`} required />
       </div>
       {state.error ? <p className="text-xs text-red-600">{state.error}</p> : null}
       {state.ok && state.success ? <p className="text-xs text-emerald-700">{state.success}</p> : null}
@@ -69,8 +73,10 @@ export function AgentMessageForm({ requestCode }: { requestCode: string }) {
   return (
     <form action={action} className="space-y-2 rounded-lg border border-[var(--lv-border)] p-3">
       <input type="hidden" name="request_code" value={requestCode} />
-      <label className="text-xs font-medium text-[var(--lv-ink)]">Message to manager</label>
-      <textarea name="message" rows={3} className={inputClass} maxLength={2000} required />
+      <label htmlFor="agent_message" className="text-xs font-medium text-[var(--lv-ink)]">
+        Message to manager
+      </label>
+      <textarea id="agent_message" name="message" rows={3} className={inputClass} maxLength={2000} required />
       {state.error ? <p className="text-xs text-red-600">{state.error}</p> : null}
       {state.ok && state.success ? <p className="text-xs text-emerald-700">{state.success}</p> : null}
       <button

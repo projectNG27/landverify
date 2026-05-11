@@ -21,8 +21,10 @@ export function AdminAssignRequestForm({
     <form action={action} className="space-y-3 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-4">
       <input type="hidden" name="request_code" value={requestCode} />
       <div>
-        <label className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Assign agent</label>
-        <select name="agent_id" className={inputClass} defaultValue="" required>
+        <label htmlFor="agent_id" className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">
+          Assign agent
+        </label>
+        <select id="agent_id" name="agent_id" className={inputClass} defaultValue="" required>
           <option value="" disabled>
             Select agent…
           </option>

@@ -20,8 +20,10 @@ export function AdminPaymentStatusForm({
     <form action={action} className="space-y-3 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-4">
       <input type="hidden" name="request_code" value={requestCode} />
       <div>
-        <label className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Payment status</label>
-        <select name="payment_status" defaultValue={defaultStatus ?? "unpaid"} className={inputClass}>
+        <label htmlFor="payment_status" className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">
+          Payment status
+        </label>
+        <select id="payment_status" name="payment_status" defaultValue={defaultStatus ?? "unpaid"} className={inputClass}>
           <option value="unpaid">Unpaid</option>
           <option value="pending">Pending</option>
           <option value="paid">Paid</option>
