@@ -6,6 +6,7 @@ import { adminLogoutAction } from "@/app/actions/admin-auth";
 import { AdminAssignRequestForm } from "@/components/admin/AdminAssignRequestForm";
 import { AdminPaymentStatusForm } from "@/components/admin/AdminPaymentStatusForm";
 import { AdminRequestMessageForm } from "@/components/admin/AdminRequestMessageForm";
+import { AdminRequesterReplyForm } from "@/components/admin/AdminRequesterReplyForm";
 import { AdminUpdateRequestStatusForm } from "@/components/admin/AdminUpdateRequestStatusForm";
 import { getAdminSessionUser } from "@/lib/admin-auth";
 import { RequestAttachmentDownloads } from "@/components/shared/RequestAttachmentDownloads";
@@ -53,6 +54,11 @@ export default async function AdminRequestDetailPage({ params }: Props) {
   const remain = formatRemaining(r.sla_due_at);
   const attachmentNames = normalizeDocumentNames(r.document_names);
   const storedFiles = parseStoredAttachments(r.document_attachments);
+  const caseMessages = detail.messages.filter((m) => m.channel === "case");
+  const internalMessages = detail.messages.filter((m) => m.channel !== "case");
+  const pendingRequesterCase = caseMessages.filter(
+    (m) => m.sender_role === "requester" && (m.status === "sent" || m.status === "read"),
+  ).length;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
@@ -194,7 +200,7 @@ export default async function AdminRequestDetailPage({ params }: Props) {
         </aside>
       </div>
 
-      <div className="mt-6 grid gap-6 lg:grid-cols-2">
+      <div className="mt-6 grid gap-6">
         <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Agent findings</h2>
           {detail.findings.length === 0 ? (
@@ -211,22 +217,69 @@ export default async function AdminRequestDetailPage({ params }: Props) {
           )}
         </section>
 
+        <div className="grid gap-6 lg:grid-cols-2">
         <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Case messages</h2>
-          {detail.messages.length === 0 ? (
-            <p className="mt-3 text-sm text-[var(--lv-ink-faint)]">No messages yet.</p>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">
+              Requester messages
+            </h2>
+            {pendingRequesterCase > 0 ? (
+              <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
+                {pendingRequesterCase} open
+              </span>
+            ) : (
+              <span className="text-xs text-[var(--lv-ink-faint)]">All caught up</span>
+            )}
+          </div>
+          <p className="mt-2 text-xs text-[var(--lv-ink-muted)]">
+            Visible to the requester on the public tracking page after they verify with request ID + email.
+          </p>
+          {caseMessages.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--lv-ink-faint)]">No requester messages yet.</p>
+          ) : (
+            <ul className="mt-3 max-h-72 space-y-3 overflow-y-auto">
+              {caseMessages.map((m) => (
+                <li key={m.id} className="rounded-lg border border-[var(--lv-border)] p-3 text-sm">
+                  <p className="font-semibold text-[var(--lv-ink)]">
+                    {m.sender_name}{" "}
+                    <span className="font-normal text-[var(--lv-ink-faint)]">
+                      ({m.sender_role}) · {m.status}
+                    </span>
+                  </p>
+                  <p className="mt-0.5 text-xs text-[var(--lv-ink-faint)]">
+                    {new Date(m.created_at).toLocaleString()}
+                    {m.sender_email ? ` · ${m.sender_email}` : null}
+                  </p>
+                  <p className="mt-2 whitespace-pre-wrap text-[var(--lv-ink-muted)]">{m.message_body}</p>
+                </li>
+              ))}
+            </ul>
+          )}
+          <AdminRequesterReplyForm requestCode={r.request_code} />
+        </section>
+
+        <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">
+            Internal notes (manager / agent)
+          </h2>
+          <p className="mt-2 text-xs text-[var(--lv-ink-muted)]">Not shown on the public tracking page.</p>
+          {internalMessages.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--lv-ink-faint)]">No internal messages yet.</p>
           ) : (
             <ul className="mt-3 space-y-3">
-              {detail.messages.map((m, idx) => (
-                <li key={`${m.created_at}-${idx}`} className="rounded-lg border border-[var(--lv-border)] p-3 text-sm">
-                  <p className="font-semibold text-[var(--lv-ink)]">{m.sender_name} <span className="font-normal text-[var(--lv-ink-faint)]">({m.sender_role})</span></p>
-                  <p className="mt-1 text-[var(--lv-ink-muted)]">{m.message}</p>
+              {internalMessages.map((m, idx) => (
+                <li key={`${m.id}-${idx}`} className="rounded-lg border border-[var(--lv-border)] p-3 text-sm">
+                  <p className="font-semibold text-[var(--lv-ink)]">
+                    {m.sender_name} <span className="font-normal text-[var(--lv-ink-faint)]">({m.sender_role})</span>
+                  </p>
+                  <p className="mt-1 text-[var(--lv-ink-muted)]">{m.message_body}</p>
                 </li>
               ))}
             </ul>
           )}
           <AdminRequestMessageForm requestCode={r.request_code} />
         </section>
+        </div>
       </div>
 
       <div className="mt-6 flex flex-wrap gap-4 text-sm font-semibold text-[var(--lv-primary)]">

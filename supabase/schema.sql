@@ -111,13 +111,22 @@ create index if not exists report_outputs_request_id_idx on public.report_output
 create table if not exists public.request_messages (
   id bigserial primary key,
   request_id uuid not null references public.requests(id) on delete cascade,
-  sender_role text not null check (sender_role in ('manager', 'agent')),
+  sender_role text not null check (sender_role in ('requester', 'admin', 'manager', 'agent')),
   sender_name text not null,
-  message text not null,
-  created_at timestamptz not null default now()
+  sender_email text,
+  message_body text not null,
+  source text not null default 'web' check (source in ('web', 'mailgun', 'admin')),
+  status text not null default 'sent' check (status in ('sent', 'read', 'replied')),
+  replied_at timestamptz,
+  channel text not null default 'internal' check (channel in ('case', 'internal')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create index if not exists request_messages_request_id_idx on public.request_messages(request_id, created_at);
+create index if not exists request_messages_case_pending_idx
+  on public.request_messages (request_id, created_at)
+  where channel = 'case' and sender_role = 'requester' and status in ('sent', 'read');
 
 create table if not exists public.agent_findings (
   id bigserial primary key,
@@ -143,6 +152,12 @@ $$ language plpgsql;
 drop trigger if exists requests_set_updated_at on public.requests;
 create trigger requests_set_updated_at
 before update on public.requests
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists request_messages_set_updated_at on public.request_messages;
+create trigger request_messages_set_updated_at
+before update on public.request_messages
 for each row
 execute function public.set_updated_at();
 

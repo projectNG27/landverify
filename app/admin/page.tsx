@@ -73,6 +73,12 @@ export default async function AdminHomePage() {
 
       <div className="mt-8 flex flex-wrap gap-3">
         <Link
+          href="/admin/requests?pending_case=1"
+          className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-950 hover:border-amber-400 dark:border-amber-900/50 dark:bg-amber-950/30 dark:text-amber-100"
+        >
+          Pending requester messages
+        </Link>
+        <Link
           href="/admin/requests"
           className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-4 py-2 text-sm font-semibold text-[var(--lv-ink)] hover:border-[var(--lv-primary)]/40"
         >

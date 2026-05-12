@@ -4,6 +4,16 @@ import { timelineDetailFromStatus, timelineIndexFromStatus, type RequestStatus }
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { trackRequestSchema } from "@/lib/validations/track-request";
 
+export type TrackCaseMessagePublic = {
+  id: number;
+  sender_role: "requester" | "admin";
+  sender_name: string;
+  message_body: string;
+  status: string;
+  replied_at: string | null;
+  created_at: string;
+};
+
 export type TrackRequestHistoryEntry = {
   status: RequestStatus;
   note: string | null;
@@ -20,6 +30,8 @@ export type TrackRequestActionResult =
       timeline_index?: number;
       timeline_detail?: string;
       history?: TrackRequestHistoryEntry[];
+      /** Present in live mode: case channel only */
+      case_messages?: TrackCaseMessagePublic[];
     }
   | {
       ok: false;
@@ -90,6 +102,26 @@ export async function lookupTrackRequest(input: unknown): Promise<TrackRequestAc
     created_at: row.created_at as string,
   }));
 
+  const { data: caseMsgs } = await supabase
+    .from("request_messages")
+    .select("id, sender_role, sender_name, message_body, status, replied_at, created_at")
+    .eq("request_id", request.id)
+    .eq("channel", "case")
+    .order("created_at", { ascending: true })
+    .limit(100);
+
+  const case_messages: TrackCaseMessagePublic[] = (caseMsgs ?? [])
+    .filter((row) => row.sender_role === "requester" || row.sender_role === "admin")
+    .map((row) => ({
+      id: Number(row.id),
+      sender_role: row.sender_role as "requester" | "admin",
+      sender_name: String(row.sender_name),
+      message_body: String(row.message_body),
+      status: String(row.status),
+      replied_at: row.replied_at as string | null,
+      created_at: String(row.created_at),
+    }));
+
   return {
     ok: true,
     mode: "live",
@@ -99,5 +131,6 @@ export async function lookupTrackRequest(input: unknown): Promise<TrackRequestAc
     timeline_index: timelineIndexFromStatus(currentStatus),
     timeline_detail: timelineDetailFromStatus(currentStatus),
     history,
+    case_messages,
   };
 }

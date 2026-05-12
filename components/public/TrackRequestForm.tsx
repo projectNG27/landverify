@@ -1,9 +1,10 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { lookupTrackRequest, type TrackRequestActionResult } from "@/app/actions/track-request";
+import { TrackCaseMessagesPanel } from "@/components/public/TrackCaseMessagesPanel";
 import {
   trackRequestSchema,
   type TrackRequestInput,
@@ -64,6 +65,7 @@ function formatHistoryWhen(iso: string) {
 export function TrackRequestForm() {
   const [result, setResult] = useState<TrackRequestActionResult | null>(null);
   const [serverMessage, setServerMessage] = useState<string | null>(null);
+  const lastTracked = useRef<{ request_id: string; email: string } | null>(null);
 
   const form = useForm<TrackRequestInput>({
     resolver: zodResolver(trackRequestSchema),
@@ -74,9 +76,23 @@ export function TrackRequestForm() {
   async function onSubmit(values: TrackRequestInput) {
     setServerMessage(null);
     setResult(null);
+    lastTracked.current = null;
     const res = await lookupTrackRequest(values);
     setResult(res);
     if (!res.ok && res.message) setServerMessage(res.message);
+    if (res.ok && res.mode === "live") {
+      lastTracked.current = {
+        request_id: values.request_id.trim().toUpperCase(),
+        email: values.email.trim(),
+      };
+    }
+  }
+
+  async function refreshLiveTracking() {
+    const ctx = lastTracked.current;
+    if (!ctx) return;
+    const res = await lookupTrackRequest(ctx);
+    if (res.ok && res.mode === "live") setResult(res);
   }
 
   const previewOk = result?.ok === true && result.mode === "preview";
@@ -85,7 +101,7 @@ export function TrackRequestForm() {
   const history = liveOk && result.history && result.history.length > 0 ? result.history : null;
 
   return (
-    <div className="mx-auto max-w-lg">
+    <div className={liveOk ? "mx-auto max-w-2xl" : "mx-auto max-w-lg"}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
         className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-card)] p-6 shadow-sm"
@@ -203,6 +219,14 @@ export function TrackRequestForm() {
                 ))}
               </ol>
             </div>
+          ) : null}
+          {liveOk && lastTracked.current && result.ok && result.mode === "live" ? (
+            <TrackCaseMessagesPanel
+              requestId={lastTracked.current.request_id}
+              email={lastTracked.current.email}
+              messages={result.case_messages ?? []}
+              onAfterSend={refreshLiveTracking}
+            />
           ) : null}
         </div>
       )}

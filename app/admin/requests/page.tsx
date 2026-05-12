@@ -13,11 +13,18 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default async function AdminRequestsPage() {
+type PageProps = {
+  searchParams?: Promise<{ pending_case?: string }>;
+};
+
+export default async function AdminRequestsPage({ searchParams }: PageProps) {
   const user = await getAdminSessionUser();
   if (!user) redirect("/admin/login");
   const configured = isSupabaseConfigured();
-  const rows = configured ? await getManagerRequestSummaries() : [];
+  const sp = searchParams ? await searchParams : {};
+  const pendingOnly = sp.pending_case === "1";
+  const allRows = configured ? await getManagerRequestSummaries() : [];
+  const rows = pendingOnly ? allRows.filter((r) => r.pending_case_message_count > 0) : allRows;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 sm:py-16">
@@ -39,6 +46,21 @@ export default async function AdminRequestsPage() {
         </form>
       </div>
 
+      <div className="mt-4 flex flex-wrap items-center gap-3 text-sm">
+        <Link
+          href="/admin/requests"
+          className={`rounded-lg px-3 py-1.5 font-medium ${!pendingOnly ? "bg-[var(--lv-primary)] text-white" : "border border-[var(--lv-border)] text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)]"}`}
+        >
+          All requests
+        </Link>
+        <Link
+          href="/admin/requests?pending_case=1"
+          className={`rounded-lg px-3 py-1.5 font-medium ${pendingOnly ? "bg-amber-600 text-white" : "border border-[var(--lv-border)] text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)]"}`}
+        >
+          Pending requester messages
+        </Link>
+      </div>
+
       {!configured ? (
         <p className="mt-6 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">
           Supabase is not configured in this environment.
@@ -56,6 +78,7 @@ export default async function AdminRequestsPage() {
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Agent</th>
+                <th className="px-4 py-3">Requester msgs</th>
                 <th className="px-4 py-3">Docs</th>
                 <th className="px-4 py-3">Deadline</th>
               </tr>
@@ -81,6 +104,15 @@ export default async function AdminRequestsPage() {
                     <td className="px-4 py-3 text-[var(--lv-ink-muted)]">{r.status.replace(/_/g, " ")}</td>
                     <td className="px-4 py-3 text-[var(--lv-ink-muted)]">{r.assigned_agent_name ?? "—"}</td>
                     <td className="px-4 py-3 text-[var(--lv-ink-muted)]">
+                      {r.pending_case_message_count > 0 ? (
+                        <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">
+                          {r.pending_case_message_count} open
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-[var(--lv-ink-muted)]">
                       {docCount > 0 ? (
                         <span className="rounded-full bg-[var(--lv-muted)] px-2 py-0.5 text-xs font-semibold">{docCount}</span>
                       ) : (
@@ -95,8 +127,8 @@ export default async function AdminRequestsPage() {
               })}
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-4 py-6 text-center text-[var(--lv-ink-faint)]">
-                    No requests found yet.
+                  <td colSpan={9} className="px-4 py-6 text-center text-[var(--lv-ink-faint)]">
+                    {pendingOnly ? "No requests with open requester messages." : "No requests found yet."}
                   </td>
                 </tr>
               ) : null}

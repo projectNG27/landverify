@@ -4,8 +4,10 @@ import { revalidatePath } from "next/cache";
 import { hashAgentPassword } from "@/lib/agent-auth";
 import { getAdminSessionUser } from "@/lib/admin-auth";
 import type { RequestStatus } from "@/lib/db/request-status";
+import { sendMailgunEmail, isMailgunConfigured } from "@/lib/mailgun";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { adminUpdateRequestStatusSchema } from "@/lib/validations/admin-request-status";
+import { sanitizeCaseMessageBody } from "@/lib/validations/track-message";
 
 export type AdminUpdateRequestStatusState = {
   ok: boolean;
@@ -198,7 +200,7 @@ export async function adminSendRequestMessageAction(_: AdminAssignState, formDat
   if (!isSupabaseConfigured()) return { ok: false, error: "Supabase is not configured on this server." };
 
   const requestCode = String(formData.get("request_code") ?? "").trim().toUpperCase();
-  const message = String(formData.get("message") ?? "").trim();
+  const message = String(formData.get("message_body") ?? formData.get("message") ?? "").trim();
   if (!/^LV-\d{4}-[A-Z0-9]{4,16}$/i.test(requestCode)) return { ok: false, error: "Enter valid request ID." };
   if (message.length < 2) return { ok: false, error: "Enter a message." };
 
@@ -209,11 +211,81 @@ export async function adminSendRequestMessageAction(_: AdminAssignState, formDat
     request_id: request.id,
     sender_role: "manager",
     sender_name: user,
-    message,
+    sender_email: null,
+    message_body: message,
+    source: "admin",
+    status: "sent",
+    channel: "internal",
   });
   if (error) return { ok: false, error: "Could not send message." };
 
+  console.info(JSON.stringify({ action: "request_message_internal_manager", request_code: request.request_code }));
+
   revalidatePath(`/admin/requests/${request.request_code}`);
   revalidatePath("/agent");
+  revalidatePath("/track-request");
   return { ok: true, success: "Message sent." };
+}
+
+export async function adminReplyToRequesterCaseAction(_: AdminAssignState, formData: FormData): Promise<AdminAssignState> {
+  const user = await getAdminSessionUser();
+  if (!user) return { ok: false, error: "Your admin session expired. Sign in again." };
+  if (!isSupabaseConfigured()) return { ok: false, error: "Supabase is not configured on this server." };
+
+  const requestCode = String(formData.get("request_code") ?? "").trim().toUpperCase();
+  const message = String(formData.get("message_body") ?? "").trim();
+  if (!/^LV-\d{4}-[A-Z0-9]{4,16}$/i.test(requestCode)) return { ok: false, error: "Enter valid request ID." };
+  if (message.length < 2) return { ok: false, error: "Enter a message." };
+
+  const body = sanitizeCaseMessageBody(message);
+  if (body.length < 2) return { ok: false, error: "Enter a message." };
+
+  const supabase = getSupabaseAdminClient();
+  const { data: request } = await supabase
+    .from("requests")
+    .select("id, request_code, email")
+    .eq("request_code", requestCode)
+    .maybeSingle();
+  if (!request) return { ok: false, error: "Request not found." };
+
+  const { error: insErr } = await supabase.from("request_messages").insert({
+    request_id: request.id,
+    sender_role: "admin",
+    sender_name: user,
+    sender_email: null,
+    message_body: body,
+    source: "admin",
+    status: "sent",
+    channel: "case",
+  });
+  if (insErr) {
+    console.error("adminReplyToRequesterCaseAction insert", insErr);
+    return { ok: false, error: "Could not save reply." };
+  }
+
+  await supabase
+    .from("request_messages")
+    .update({ status: "replied", replied_at: new Date().toISOString() })
+    .eq("request_id", request.id)
+    .eq("channel", "case")
+    .eq("sender_role", "requester")
+    .in("status", ["sent", "read"]);
+
+  console.info(JSON.stringify({ action: "case_message_admin_reply", request_code: request.request_code }));
+
+  const to = String(request.email ?? "")
+    .trim()
+    .toLowerCase();
+  if (to.includes("@") && isMailgunConfigured()) {
+    await sendMailgunEmail({
+      to,
+      subject: `[LandVerify] New reply for ${request.request_code}`,
+      text: `Hello,\n\nThere is a new reply for your LandVerify request ${request.request_code}.\n\nOpen the Track request page on our website, enter your request ID and the email on file, then open Messages to read the full conversation.\n\nWe do not include the full message text in email for privacy.\n`,
+    });
+  }
+
+  revalidatePath(`/admin/requests/${request.request_code}`);
+  revalidatePath("/admin/requests");
+  revalidatePath("/track-request");
+  return { ok: true, success: "Reply sent to requester." };
 }

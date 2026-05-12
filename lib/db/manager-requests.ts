@@ -16,6 +16,8 @@ export type ManagerRequestSummary = {
   email: string;
   /** Raw from DB; use `normalizeDocumentNames` for display */
   document_names: unknown;
+  /** Case-channel requester messages awaiting admin reply (sent or read) */
+  pending_case_message_count: number;
 };
 
 export type RequestStatusEvent = {
@@ -33,10 +35,17 @@ export type AgentFinding = {
 };
 
 export type RequestMessage = {
-  sender_role: "manager" | "agent";
+  id: number;
+  sender_role: "requester" | "admin" | "manager" | "agent" | string;
   sender_name: string;
-  message: string;
+  sender_email: string | null;
+  message_body: string;
+  source: string;
+  status: string;
+  replied_at: string | null;
   created_at: string;
+  updated_at: string;
+  channel: "case" | "internal" | string;
 };
 
 export type ManagerRequestDetail = {
@@ -55,7 +64,24 @@ export async function getManagerRequestSummaries(): Promise<ManagerRequestSummar
     )
     .order("submitted_at", { ascending: false });
   if (error || !data) return [];
-  return data as ManagerRequestSummary[];
+
+  const { data: pendingRows } = await supabase
+    .from("request_messages")
+    .select("request_id")
+    .eq("channel", "case")
+    .eq("sender_role", "requester")
+    .in("status", ["sent", "read"]);
+
+  const pendingCount = new Map<string, number>();
+  for (const row of pendingRows ?? []) {
+    const rid = String((row as { request_id: string }).request_id);
+    pendingCount.set(rid, (pendingCount.get(rid) ?? 0) + 1);
+  }
+
+  return (data as Omit<ManagerRequestSummary, "pending_case_message_count">[]).map((r) => ({
+    ...r,
+    pending_case_message_count: pendingCount.get(r.id) ?? 0,
+  }));
 }
 
 export async function getManagerRequestMetrics() {
@@ -77,6 +103,21 @@ export async function getActiveAgentOptions() {
   return listActiveAgents();
 }
 
+/** When a manager opens the request detail page, mark new requester case messages as read. */
+export async function markCaseRequesterMessagesReadByAdmin(requestId: string): Promise<void> {
+  const supabase = getSupabaseAdminClient();
+  const { error } = await supabase
+    .from("request_messages")
+    .update({ status: "read" })
+    .eq("request_id", requestId)
+    .eq("channel", "case")
+    .eq("sender_role", "requester")
+    .eq("status", "sent");
+  if (error) {
+    console.warn("markCaseRequesterMessagesReadByAdmin:", error.message);
+  }
+}
+
 export async function getRequestDetailByCode(requestCode: string): Promise<ManagerRequestDetail> {
   const supabase = getSupabaseAdminClient();
   const code = requestCode.toUpperCase();
@@ -85,22 +126,28 @@ export async function getRequestDetailByCode(requestCode: string): Promise<Manag
     return { request: null, events: [], findings: [], messages: [] };
   }
 
+  const requestId = String((request as { id: string }).id);
+
+  await markCaseRequesterMessagesReadByAdmin(requestId);
+
   const [{ data: events }, { data: findings }, { data: messages }] = await Promise.all([
     supabase
       .from("request_status_events")
       .select("status, note, actor, created_at")
-      .eq("request_id", String((request as { id: string }).id))
+      .eq("request_id", requestId)
       .order("created_at", { ascending: false })
       .limit(50),
     supabase
       .from("agent_findings")
       .select("section_key, findings, created_at, updated_at")
-      .eq("request_id", String((request as { id: string }).id))
+      .eq("request_id", requestId)
       .order("updated_at", { ascending: false }),
     supabase
       .from("request_messages")
-      .select("sender_role, sender_name, message, created_at")
-      .eq("request_id", String((request as { id: string }).id))
+      .select(
+        "id, sender_role, sender_name, sender_email, message_body, source, status, replied_at, created_at, updated_at, channel",
+      )
+      .eq("request_id", requestId)
       .order("created_at", { ascending: true })
       .limit(200),
   ]);

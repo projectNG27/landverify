@@ -19,7 +19,7 @@ export const metadata: Metadata = {
 type Props = { params: Promise<{ requestCode: string }> };
 
 type AgentFindingRow = { section_key: string; findings: string; updated_at?: string };
-type RequestMessageRow = { sender_role: string; sender_name: string; message: string; created_at: string };
+type RequestMessageRow = { sender_role: string; sender_name: string; message_body: string; created_at: string };
 
 export default async function AgentTaskPage({ params }: Props) {
   const username = await getAgentSessionUser();
@@ -48,8 +48,9 @@ export default async function AgentTaskPage({ params }: Props) {
       .order("updated_at", { ascending: false }),
     supabase
       .from("request_messages")
-      .select("sender_role, sender_name, message, created_at")
+      .select("sender_role, sender_name, message_body, created_at, channel")
       .eq("request_id", request.id)
+      .or("channel.eq.internal,channel.is.null")
       .order("created_at", { ascending: true }),
   ]);
 
@@ -162,7 +163,7 @@ export default async function AgentTaskPage({ params }: Props) {
                 <p className="font-semibold text-[var(--lv-ink)]">
                   {m.sender_name} <span className="font-normal text-[var(--lv-ink-faint)]">({m.sender_role})</span>
                 </p>
-                <p className="mt-1 text-[var(--lv-ink-muted)]">{m.message}</p>
+                <p className="mt-1 text-[var(--lv-ink-muted)]">{m.message_body}</p>
               </li>
             ))}
           </ul>

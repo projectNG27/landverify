@@ -127,8 +127,14 @@ export async function agentSendMessageAction(_: AgentActionState, formData: Form
     request_id: request.id,
     sender_role: "agent",
     sender_name: agent.full_name,
-    message,
+    sender_email: null,
+    message_body: message,
+    source: "admin",
+    status: "sent",
+    channel: "internal",
   });
+
+  console.info(JSON.stringify({ action: "request_message_internal_agent", request_code: request.request_code }));
 
   revalidatePath(`/agent/tasks/${request.request_code}`);
   revalidatePath(`/admin/requests/${request.request_code}`);
