@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { adminLogoutAction } from "@/app/actions/admin-auth";
+import { normalizeDocumentNames } from "@/lib/document-names";
 import { formatRemaining } from "@/lib/db/sla";
 import { getManagerRequestSummaries } from "@/lib/db/manager-requests";
 import { getAdminSessionUser } from "@/lib/admin-auth";
@@ -55,12 +56,14 @@ export default async function AdminRequestsPage() {
                 <th className="px-4 py-3">Payment</th>
                 <th className="px-4 py-3">Status</th>
                 <th className="px-4 py-3">Agent</th>
+                <th className="px-4 py-3">Docs</th>
                 <th className="px-4 py-3">Deadline</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((r) => {
                 const remain = formatRemaining(r.sla_due_at);
+                const docCount = normalizeDocumentNames(r.document_names).length;
                 return (
                   <tr key={r.id} className="border-t border-[var(--lv-border)] align-top">
                     <td className="px-4 py-3 font-medium text-[var(--lv-ink)]">
@@ -77,6 +80,13 @@ export default async function AdminRequestsPage() {
                     <td className="px-4 py-3 text-[var(--lv-ink-muted)]">{r.payment_status}</td>
                     <td className="px-4 py-3 text-[var(--lv-ink-muted)]">{r.status.replace(/_/g, " ")}</td>
                     <td className="px-4 py-3 text-[var(--lv-ink-muted)]">{r.assigned_agent_name ?? "—"}</td>
+                    <td className="px-4 py-3 text-[var(--lv-ink-muted)]">
+                      {docCount > 0 ? (
+                        <span className="rounded-full bg-[var(--lv-muted)] px-2 py-0.5 text-xs font-semibold">{docCount}</span>
+                      ) : (
+                        "—"
+                      )}
+                    </td>
                     <td className={`px-4 py-3 ${remain.urgent ? "font-semibold text-red-600" : "text-[var(--lv-ink-muted)]"}`}>
                       {remain.text}
                     </td>
@@ -85,7 +95,7 @@ export default async function AdminRequestsPage() {
               })}
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-6 text-center text-[var(--lv-ink-faint)]">
+                  <td colSpan={8} className="px-4 py-6 text-center text-[var(--lv-ink-faint)]">
                     No requests found yet.
                   </td>
                 </tr>

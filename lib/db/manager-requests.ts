@@ -14,6 +14,8 @@ export type ManagerRequestSummary = {
   sla_due_at: string | null;
   full_name: string;
   email: string;
+  /** Raw from DB; use `normalizeDocumentNames` for display */
+  document_names: unknown;
 };
 
 export type RequestStatusEvent = {
@@ -49,7 +51,7 @@ export async function getManagerRequestSummaries(): Promise<ManagerRequestSummar
   const { data, error } = await supabase
     .from("requests")
     .select(
-      "id, request_code, product_id, payment_status, status, submitted_at, assigned_agent_name, sla_due_at, full_name, email",
+      "id, request_code, product_id, payment_status, status, submitted_at, assigned_agent_name, sla_due_at, full_name, email, document_names",
     )
     .order("submitted_at", { ascending: false });
   if (error || !data) return [];

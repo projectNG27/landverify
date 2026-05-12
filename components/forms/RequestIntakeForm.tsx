@@ -10,12 +10,12 @@ import { RequestIntakeSuccess } from "@/components/forms/RequestIntakeSuccess";
 import { STATE_LGAS, type SupportedState } from "@/lib/locations";
 import { PRODUCTS } from "@/lib/products";
 import {
-  ACCEPTED_MIME,
   MAX_DOCUMENTS,
   MAX_FILE_BYTES,
   REQUEST_INTAKE_STATE_VALUES,
   parseCaptchaAnswerDigits,
   requestIntakeClientResolverSchema,
+  resolveIntakeFileMime,
   type RequestIntakeFormValues,
 } from "@/lib/validations/request-intake";
 
@@ -45,14 +45,13 @@ function validateFiles(files: FileList | null): { ok: true; names: string[] } | 
     return { ok: false, message: `You can attach up to ${MAX_DOCUMENTS} files.` };
   }
   const names: string[] = [];
-  const mimeSet = new Set(ACCEPTED_MIME);
   for (let i = 0; i < files.length; i++) {
     const f = files.item(i);
     if (!f) continue;
     if (f.size > MAX_FILE_BYTES) {
       return { ok: false, message: `“${f.name}” is larger than 5 MB.` };
     }
-    if (!mimeSet.has(f.type as (typeof ACCEPTED_MIME)[number])) {
+    if (!resolveIntakeFileMime(f)) {
       return {
         ok: false,
         message: `“${f.name}” must be PDF, JPEG, PNG, or WebP.`,
@@ -243,14 +242,36 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
       return;
     }
 
-    const payload = {
-      ...values,
-      document_names: fileCheck.names.length ? fileCheck.names : undefined,
-      captcha_expected: expectedSum,
-      form_started_at: pageOpenMsRef.current > 0 ? pageOpenMsRef.current : formStartedAt,
-    };
+    const fd = new FormData();
+    fd.append("full_name", values.full_name);
+    fd.append("email", values.email);
+    fd.append("phone", values.phone);
+    fd.append("whatsapp_number", values.whatsapp_number);
+    fd.append("product_id", values.product_id);
+    fd.append("state", values.state);
+    fd.append("lga", values.lga);
+    fd.append("land_location_description", values.land_location_description);
+    fd.append("google_maps_link", values.google_maps_link);
+    fd.append("coordinates", values.coordinates);
+    fd.append("seller_name", values.seller_name);
+    fd.append("seller_phone", values.seller_phone);
+    fd.append("additional_notes", values.additional_notes);
+    if (values.consent) fd.append("consent", "on");
+    fd.append("captcha_answer", values.captcha_answer);
+    fd.append("captcha_expected", String(expectedSum));
+    fd.append("form_started_at", String(pageOpenMsRef.current > 0 ? pageOpenMsRef.current : formStartedAt));
+    fd.append("website", values.website ?? "");
 
-    const result = await submitRequestIntake(payload);
+    const files = fileInputRef.current?.files;
+    fd.append("intake_file_count", String(files?.length ?? 0));
+    if (files) {
+      for (let i = 0; i < files.length; i++) {
+        const f = files.item(i);
+        if (f) fd.append("documents", f);
+      }
+    }
+
+    const result = await submitRequestIntake(fd);
 
     if (!result.ok) {
       if (result.message) setRootMessage(result.message);
@@ -612,16 +633,16 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
         </fieldset>
 
         <fieldset className="space-y-4 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-6 shadow-sm">
-          <legend className="px-1 text-lg font-semibold text-[var(--lv-ink)]">Documents (optional for now)</legend>
+          <legend className="px-1 text-lg font-semibold text-[var(--lv-ink)]">Documents (optional)</legend>
           <p className="text-sm text-[var(--lv-ink-muted)]">
-            Survey plan, deed, allocation letter, etc. Files are checked on this device only—upload to secure storage
-            when the backend is connected.
+            Survey plan, deed, allocation letter, etc. When the site is connected to Supabase Storage, files are stored
+            privately and your team can download them from the manager request page.
           </p>
           <input
             ref={fileInputRef}
             type="file"
             multiple
-            accept={ACCEPTED_MIME.join(",")}
+            accept="application/pdf,image/jpeg,image/png,image/webp,.pdf,.jpg,.jpeg,.png,.webp"
             className="block w-full max-w-lg text-sm text-[var(--lv-ink-muted)] file:mr-4 file:rounded-md file:border-0 file:bg-[var(--lv-primary)] file:px-4 file:py-2 file:text-sm file:font-semibold file:text-white"
           />
           <p className="text-xs text-[var(--lv-ink-faint)]">

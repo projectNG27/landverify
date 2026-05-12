@@ -39,6 +39,7 @@ create table if not exists public.requests (
   seller_phone text not null,
   additional_notes text,
   document_names text[] not null default '{}',
+  document_attachments jsonb not null default '[]'::jsonb,
   payment_status text not null default 'unpaid',
   assigned_agent_id uuid,
   assigned_agent_name text,

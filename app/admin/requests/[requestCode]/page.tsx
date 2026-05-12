@@ -1,12 +1,16 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { adminLogoutAction } from "@/app/actions/admin-auth";
 import { AdminAssignRequestForm } from "@/components/admin/AdminAssignRequestForm";
 import { AdminPaymentStatusForm } from "@/components/admin/AdminPaymentStatusForm";
 import { AdminRequestMessageForm } from "@/components/admin/AdminRequestMessageForm";
 import { AdminUpdateRequestStatusForm } from "@/components/admin/AdminUpdateRequestStatusForm";
 import { getAdminSessionUser } from "@/lib/admin-auth";
+import { RequestAttachmentDownloads } from "@/components/shared/RequestAttachmentDownloads";
+import { normalizeDocumentNames } from "@/lib/document-names";
+import { parseStoredAttachments } from "@/lib/request-document-storage";
 import { formatRemaining } from "@/lib/db/sla";
 import { getActiveAgentOptions, getRequestDetailByCode } from "@/lib/db/manager-requests";
 
@@ -32,7 +36,8 @@ type RequestDetailRow = {
   coordinates_lat: number | null;
   coordinates_lng: number | null;
   assigned_agent_name: string | null;
-  document_names: string[] | null;
+  document_names: unknown;
+  document_attachments: unknown;
   sla_due_at: string | null;
 };
 
@@ -46,6 +51,8 @@ export default async function AdminRequestDetailPage({ params }: Props) {
 
   const r = detail.request as RequestDetailRow;
   const remain = formatRemaining(r.sla_due_at);
+  const attachmentNames = normalizeDocumentNames(r.document_names);
+  const storedFiles = parseStoredAttachments(r.document_attachments);
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
@@ -117,13 +124,62 @@ export default async function AdminRequestDetailPage({ params }: Props) {
               <dt className="text-[var(--lv-ink-faint)]">Deadline</dt>
               <dd className={remain.urgent ? "font-semibold text-red-600" : "text-[var(--lv-ink)]"}>{remain.text}</dd>
             </div>
-            <div className="sm:col-span-2">
-              <dt className="text-[var(--lv-ink-faint)]">Documents</dt>
-              <dd className="text-[var(--lv-ink)]">
-                {Array.isArray(r.document_names) && r.document_names.length > 0 ? r.document_names.join(", ") : "None attached"}
-              </dd>
-            </div>
           </dl>
+
+          <div className="mt-6 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/25 p-4">
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h3 className="text-sm font-semibold text-[var(--lv-ink)]">Attachments from intake</h3>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--lv-ink-muted)]">
+                  Files uploaded with the form are stored in your Supabase Storage bucket. Use the links below to open or
+                  download. Older cases may list filenames only (before uploads were enabled).
+                </p>
+              </div>
+              <span className="rounded-full bg-[var(--lv-surface)] px-2.5 py-1 text-xs font-semibold text-[var(--lv-ink-muted)] ring-1 ring-[var(--lv-border)]">
+                {storedFiles.length > 0 ? `${storedFiles.length} stored` : `${attachmentNames.length} named`}
+              </span>
+            </div>
+
+            {storedFiles.length > 0 ? (
+              <div className="mt-4">
+                <Suspense
+                  fallback={
+                    <p className="text-sm text-[var(--lv-ink-faint)]">Preparing secure download links…</p>
+                  }
+                >
+                  <RequestAttachmentDownloads
+                    attachments={r.document_attachments}
+                    intro="Click a file to download. Forward these to field agents or counsel as needed."
+                  />
+                </Suspense>
+              </div>
+            ) : null}
+
+            {storedFiles.length === 0 && attachmentNames.length > 0 ? (
+              <ul className="mt-4 grid gap-2 sm:grid-cols-2">
+                {attachmentNames.map((name) => (
+                  <li
+                    key={name}
+                    className="flex items-center gap-2 rounded-lg border border-dashed border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm text-[var(--lv-ink)]"
+                  >
+                    <span className="select-none text-[var(--lv-ink-faint)]" aria-hidden>
+                      📎
+                    </span>
+                    <span className="min-w-0 flex-1 truncate font-medium" title={name}>
+                      {name}{" "}
+                      <span className="text-xs font-normal text-[var(--lv-ink-faint)]">(filename only — no file)</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            {storedFiles.length === 0 && attachmentNames.length === 0 ? (
+              <p className="mt-4 text-sm text-[var(--lv-ink-faint)]">
+                No documents were attached on this submission.
+              </p>
+            ) : null}
+          </div>
         </section>
 
         <aside className="space-y-4">

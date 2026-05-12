@@ -191,3 +191,32 @@ export type RequestIntakeValues = z.infer<typeof requestIntakeSchema>;
 export const MAX_DOCUMENTS = 12;
 export const MAX_FILE_BYTES = 5 * 1024 * 1024;
 export const ACCEPTED_MIME = ["application/pdf", "image/jpeg", "image/png", "image/webp"] as const;
+
+/** Maps extension → MIME when the browser reports empty/`application/octet-stream` (common for PDFs). */
+export function resolveIntakeFileMime(file: Pick<File, "name" | "type">): (typeof ACCEPTED_MIME)[number] | null {
+  const reported = file.type.trim().toLowerCase();
+  if ((ACCEPTED_MIME as readonly string[]).includes(reported)) {
+    return reported as (typeof ACCEPTED_MIME)[number];
+  }
+  const extMatch = file.name.toLowerCase().match(/\.([a-z0-9]+)$/);
+  const ext = extMatch?.[1];
+  const byExt: Record<string, (typeof ACCEPTED_MIME)[number]> = {
+    pdf: "application/pdf",
+    jpg: "image/jpeg",
+    jpeg: "image/jpeg",
+    png: "image/png",
+    webp: "image/webp",
+  };
+  if (ext && byExt[ext]) return byExt[ext];
+  return null;
+}
+
+/** Ensures `File.type` matches an allowed MIME so Storage `contentType` and validation agree. */
+export function normalizeIntakeFilesForUpload(files: File[]): File[] {
+  return files.map((f) => {
+    const m = resolveIntakeFileMime(f);
+    if (!m) return f;
+    if (f.type === m) return f;
+    return new File([f], f.name, { type: m });
+  });
+}

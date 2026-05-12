@@ -1,10 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { Suspense } from "react";
 import { agentLogoutAction } from "@/app/actions/agent-auth";
 import { AgentAcceptTaskForm, AgentFindingsForm, AgentMessageForm } from "@/components/agent/AgentTaskActionForms";
+import { RequestAttachmentDownloads } from "@/components/shared/RequestAttachmentDownloads";
 import { getAgentSessionUser } from "@/lib/admin-auth";
 import { formatRemaining } from "@/lib/db/sla";
+import { normalizeDocumentNames } from "@/lib/document-names";
+import { parseStoredAttachments } from "@/lib/request-document-storage";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
@@ -30,7 +34,7 @@ export default async function AgentTaskPage({ params }: Props) {
   const { data: request } = await supabase
     .from("requests")
     .select(
-      "id, request_code, product_id, status, assigned_agent_id, land_location_description, google_maps_link, coordinates_lat, coordinates_lng, document_names, sla_due_at",
+      "id, request_code, product_id, status, assigned_agent_id, land_location_description, google_maps_link, coordinates_lat, coordinates_lng, document_names, document_attachments, sla_due_at",
     )
     .eq("request_code", requestCode.toUpperCase())
     .maybeSingle();
@@ -53,6 +57,12 @@ export default async function AgentTaskPage({ params }: Props) {
   const messages = (messagesRaw ?? []) as RequestMessageRow[];
 
   const remain = formatRemaining(request.sla_due_at);
+  const storedDocs = parseStoredAttachments(
+    (request as { document_attachments?: unknown }).document_attachments,
+  );
+  const nameOnlyDocs = normalizeDocumentNames(
+    (request as { document_names?: unknown }).document_names,
+  );
 
   return (
     <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">
@@ -95,15 +105,29 @@ export default async function AgentTaskPage({ params }: Props) {
               {request.coordinates_lat && request.coordinates_lng ? `${request.coordinates_lat}, ${request.coordinates_lng}` : "—"}
             </dd>
           </div>
-          <div>
-            <dt className="text-[var(--lv-ink-faint)]">Required docs</dt>
-            <dd className="text-[var(--lv-ink)]">
-              {Array.isArray(request.document_names) && request.document_names.length > 0
-                ? request.document_names.join(", ")
-                : "No documents attached"}
-            </dd>
-          </div>
         </dl>
+
+        <div className="mt-5 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/30 p-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">Customer documents</p>
+          {storedDocs.length > 0 ? (
+            <div className="mt-3">
+              <Suspense fallback={<p className="text-sm text-[var(--lv-ink-faint)]">Loading files…</p>}>
+                <RequestAttachmentDownloads
+                  attachments={(request as { document_attachments?: unknown }).document_attachments}
+                  intro="Download and share with your contacts as needed. Links expire after about an hour — refresh this page if needed."
+                />
+              </Suspense>
+            </div>
+          ) : null}
+          {storedDocs.length === 0 && nameOnlyDocs.length > 0 ? (
+            <p className="mt-3 text-sm text-[var(--lv-ink-muted)]">
+              Filenames on file (no binary uploaded): {nameOnlyDocs.join(", ")}
+            </p>
+          ) : null}
+          {storedDocs.length === 0 && nameOnlyDocs.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--lv-ink-faint)]">No documents attached for this request.</p>
+          ) : null}
+        </div>
       </section>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
