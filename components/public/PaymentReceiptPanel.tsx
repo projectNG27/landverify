@@ -85,27 +85,16 @@ export function PaymentReceiptPanel({ requestId, email, customerName, receipt }:
         id="lv-payment-receipt"
         className="mt-6 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-8 text-left shadow-sm print:mt-0 print:rounded-none print:border-0 print:p-0 print:shadow-none"
       >
-        <header className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--lv-border)] pb-6 print:border-b print:border-neutral-300 print:pb-5">
-          <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
-            <div className="shrink-0 print:block">
-              <Image
-                src="/brand/logo2.png"
-                alt="Nigeria LandVerify"
-                width={220}
-                height={64}
-                className="h-12 w-auto max-w-[min(100%,15rem)] object-contain object-left sm:h-14 print:h-[3.25rem] print:max-w-[14rem]"
-                priority
-              />
-            </div>
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--lv-ink-muted)] print:text-neutral-600">
-                Payment receipt
-              </p>
-              <p className="mt-2 max-w-sm text-xs leading-relaxed text-[var(--lv-ink-muted)] print:text-neutral-700">
-                Axiomate Limited · Professional land verification (Nigeria). This document confirms receipt of payment
-                for the service tier listed below.
-              </p>
-            </div>
+        <header className="flex flex-wrap items-center justify-between gap-4 border-b border-[var(--lv-border)] pb-6 print:border-b print:border-neutral-300 print:pb-5">
+          <div className="shrink-0 print:block">
+            <Image
+              src="/brand/logo2.png"
+              alt="LandVerify"
+              width={220}
+              height={64}
+              className="h-12 w-auto max-w-[min(100%,15rem)] object-contain object-left sm:h-14 print:h-[3.25rem] print:max-w-[14rem]"
+              priority
+            />
           </div>
           <div className="text-right text-xs text-[var(--lv-ink-muted)] print:text-neutral-600">
             <p className="font-semibold text-[var(--lv-ink)] print:text-black">Receipt</p>
