@@ -8,6 +8,12 @@ import { paymentChannelLabel } from "@/lib/payment-display";
 
 export type ReceiptEmailResult = { ok: true } | { ok: false; message: string };
 
+function siteOrigin(): string {
+  const raw = process.env.NEXT_PUBLIC_SITE_URL?.trim();
+  if (!raw) return "";
+  return raw.replace(/\/$/, "");
+}
+
 function receiptHtml(params: {
   requestCode: string;
   customerName: string;
@@ -17,8 +23,14 @@ function receiptHtml(params: {
   paidAt: string;
   channelLabel: string;
 }): string {
+  const origin = siteOrigin();
+  const logoUrl = origin ? `${origin}/brand/logo2.png` : "";
+  const logoBlock = logoUrl
+    ? `<div style="margin-bottom:20px"><img src="${escapeHtml(logoUrl)}" alt="Nigeria LandVerify" width="200" style="max-width:100%;height:auto;display:block" /></div>`
+    : "";
   return `<!DOCTYPE html>
 <html><body style="font-family:system-ui,sans-serif;max-width:520px;margin:0 auto;padding:24px;color:#111">
+  ${logoBlock}
   <h1 style="font-size:18px">LandVerify payment receipt</h1>
   <p style="color:#444;font-size:14px">Thank you for your payment. Keep this email for your records.</p>
   <table style="width:100%;border-collapse:collapse;margin-top:16px;font-size:14px">

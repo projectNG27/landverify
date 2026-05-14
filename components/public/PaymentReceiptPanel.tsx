@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useState, useTransition } from "react";
 import { sendReceiptToEmail } from "@/app/actions/receipt-email";
 import type { TrackRequestReceipt } from "@/app/actions/track-request";
@@ -11,25 +12,6 @@ type Props = {
   customerName: string;
   receipt: TrackRequestReceipt;
 };
-
-function LandVerifyReceiptMark() {
-  return (
-    <svg width="48" height="48" viewBox="0 0 48 48" aria-hidden className="shrink-0 print:block">
-      <rect width="48" height="48" rx="10" fill="#0f4d3c" />
-      <text
-        x="24"
-        y="31"
-        textAnchor="middle"
-        fill="#ffffff"
-        fontSize="15"
-        fontFamily="system-ui, Segoe UI, sans-serif"
-        fontWeight="800"
-      >
-        LV
-      </text>
-    </svg>
-  );
-}
 
 export function PaymentReceiptPanel({ requestId, email, customerName, receipt }: Props) {
   const [mailMsg, setMailMsg] = useState<string | null>(null);
@@ -104,11 +86,19 @@ export function PaymentReceiptPanel({ requestId, email, customerName, receipt }:
         className="mt-6 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-8 text-left shadow-sm print:mt-0 print:rounded-none print:border-0 print:p-0 print:shadow-none"
       >
         <header className="flex flex-wrap items-start justify-between gap-4 border-b border-[var(--lv-border)] pb-6 print:border-b print:border-neutral-300 print:pb-5">
-          <div className="flex items-start gap-4">
-            <LandVerifyReceiptMark />
-            <div>
-              <p className="text-xl font-bold tracking-tight text-[var(--lv-ink)] print:text-black">LandVerify</p>
-              <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--lv-ink-muted)] print:text-neutral-600">
+          <div className="flex min-w-0 flex-1 flex-col gap-4 sm:flex-row sm:items-start">
+            <div className="shrink-0 print:block">
+              <Image
+                src="/brand/logo2.png"
+                alt="Nigeria LandVerify"
+                width={220}
+                height={64}
+                className="h-12 w-auto max-w-[min(100%,15rem)] object-contain object-left sm:h-14 print:h-[3.25rem] print:max-w-[14rem]"
+                priority
+              />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[var(--lv-ink-muted)] print:text-neutral-600">
                 Payment receipt
               </p>
               <p className="mt-2 max-w-sm text-xs leading-relaxed text-[var(--lv-ink-muted)] print:text-neutral-700">
