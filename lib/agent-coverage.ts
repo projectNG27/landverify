@@ -1,5 +1,6 @@
 import { REQUEST_INTAKE_STATE_VALUES } from "@/lib/validations/request-intake";
 
+/** Canonical allowed state names for agent coverage (keep in sync with public intake). */
 const ALLOWED_NAMES = new Set<string>(REQUEST_INTAKE_STATE_VALUES);
 
 /** Parse repeated `coverage_states` fields; only supported state names are kept. */
