@@ -45,7 +45,8 @@ export type IntakePaymentStatusResult =
   | {
       ok: true;
       productId: string;
-      emailHint: string;
+      /** Full normalized email for the disabled intake field (must match Paystack). */
+      payerEmail: string;
       tierLabel: string;
       amountDisplay: string;
     }
@@ -69,7 +70,7 @@ export async function getIntakePaymentStatus(reference: string): Promise<IntakeP
   return {
     ok: true,
     productId: read.productId,
-    emailHint: read.emailHint,
+    payerEmail: read.payerEmail,
     tierLabel: read.tierLabel,
     amountDisplay: read.amountDisplay,
   };

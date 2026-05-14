@@ -198,7 +198,7 @@ export function RequestIntakeForm({
   const [intakePayment, setIntakePayment] = useState<null | {
     reference: string;
     productId: string;
-    emailHint: string;
+    payerEmail: string;
     tierLabel: string;
     amountDisplay: string;
   }>(null);
@@ -268,7 +268,7 @@ export function RequestIntakeForm({
         setIntakePayment({
           reference: ref,
           productId: s.productId,
-          emailHint: s.emailHint,
+          payerEmail: s.payerEmail,
           tierLabel: s.tierLabel,
           amountDisplay: s.amountDisplay,
         });
@@ -298,7 +298,7 @@ export function RequestIntakeForm({
         }
 
         setValue("product_id", s.productId, { shouldValidate: true, shouldDirty: true });
-        setValue("email", s.emailHint, { shouldValidate: true, shouldDirty: true });
+        setValue("email", s.payerEmail, { shouldValidate: true, shouldDirty: true });
         clearErrors();
         setIntakeDraftRestored(restored);
         router.replace("/submit-request", { scroll: false });
@@ -771,8 +771,8 @@ export function RequestIntakeForm({
                   <div className="rounded-xl border border-green-600/30 bg-green-50/90 px-4 py-3 text-sm text-green-950 dark:border-green-700/40 dark:bg-green-950/35 dark:text-green-100">
                     <p className="font-semibold text-green-900 dark:text-green-200">Paystack payment confirmed</p>
                     <p className="mt-1 text-green-900/90 dark:text-green-100/90">
-                      {intakePayment.tierLabel} ({intakePayment.amountDisplay}). Use the same email you paid with; it
-                      should match <span className="font-mono font-medium">{intakePayment.emailHint}</span>.
+                      {intakePayment.tierLabel} ({intakePayment.amountDisplay}). Email for this submission is locked to{" "}
+                      <span className="font-mono font-medium">{intakePayment.payerEmail}</span> (same as Paystack).
                     </p>
                     {intakeDraftRestored ? (
                       <p className="mt-2 text-green-900/85 dark:text-green-100/85">

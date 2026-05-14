@@ -22,6 +22,9 @@ export type IntakePaymentRead =
       ok: true;
       status: "success";
       productId: string;
+      /** Normalized email used for Paystack / this payment — use for the locked form field (passes validation). */
+      payerEmail: string;
+      /** Masked hint for display only. */
       emailHint: string;
       tierLabel: string;
       amountDisplay: string;
@@ -155,11 +158,13 @@ export async function readIntakePaymentForClient(
     (row.customer_email ? String(row.customer_email) : "");
   if (!emailRaw.includes("@")) return { ok: false, message: "Payment has no email on file." };
 
+  const emailNorm = normalizeIntakeEmail(emailRaw);
   const amountKobo = Number(row.amount_kobo);
   return {
     ok: true,
     status: "success",
     productId: metaProduct,
+    payerEmail: emailNorm,
     emailHint: maskEmailForHint(emailRaw),
     tierLabel: tierLabel(metaProduct),
     amountDisplay: formatNgnFromKobo(Number.isFinite(amountKobo) ? amountKobo : amountKoboForTier(metaProduct) ?? 0),
