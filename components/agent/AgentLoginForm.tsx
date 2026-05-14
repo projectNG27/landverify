@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 import { agentLoginAction, type AgentAuthState } from "@/app/actions/agent-auth";
 
@@ -18,9 +19,14 @@ export function AgentLoginForm() {
         <input id="agent-username" name="username" className={inputClass} autoComplete="username" required />
       </div>
       <div className="mt-4">
-        <label htmlFor="agent-password" className="text-sm font-medium text-[var(--lv-ink)]">
-          Password
-        </label>
+        <div className="flex items-center justify-between gap-2">
+          <label htmlFor="agent-password" className="text-sm font-medium text-[var(--lv-ink)]">
+            Password
+          </label>
+          <Link href="/agent/forgot-password" className="text-xs font-semibold text-[var(--lv-primary)] hover:underline">
+            Forgot password?
+          </Link>
+        </div>
         <input id="agent-password" name="password" type="password" className={inputClass} autoComplete="current-password" required />
       </div>
       {state.error ? <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{state.error}</p> : null}

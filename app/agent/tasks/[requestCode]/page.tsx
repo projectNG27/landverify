@@ -106,6 +106,12 @@ export default async function AgentTaskPage({ params }: Props) {
           </p>
         </div>
         <div className="flex shrink-0 gap-2">
+          <Link
+            href="/agent/settings"
+            className="hidden rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)] sm:inline-flex sm:items-center"
+          >
+            Account
+          </Link>
           <form action={agentLogoutAction} className="hidden sm:block">
             <button
               type="submit"
@@ -233,6 +239,12 @@ export default async function AgentTaskPage({ params }: Props) {
             className="flex flex-1 min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 text-sm font-semibold text-[var(--lv-ink)]"
           >
             Queue
+          </Link>
+          <Link
+            href="/agent/settings"
+            className="flex flex-1 min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] text-sm font-semibold text-[var(--lv-ink)]"
+          >
+            Account
           </Link>
           <form action={agentLogoutAction} className="flex-1">
             <button

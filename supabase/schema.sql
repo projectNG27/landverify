@@ -99,6 +99,19 @@ create index if not exists agent_invites_pending_valid_idx
   on public.agent_invites (created_at desc)
   where used_at is null and revoked_at is null;
 
+create table if not exists public.agent_security_tokens (
+  id uuid primary key default gen_random_uuid(),
+  agent_id uuid not null references public.agents(id) on delete cascade,
+  token_hash text not null unique,
+  purpose text not null check (purpose in ('password_reset')),
+  expires_at timestamptz not null,
+  used_at timestamptz,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists agent_security_tokens_agent_created_idx
+  on public.agent_security_tokens (agent_id, created_at desc);
+
 create table if not exists public.request_status_events (
   id bigserial primary key,
   request_id uuid not null references public.requests(id) on delete cascade,
@@ -225,5 +238,6 @@ alter table public.report_outputs disable row level security;
 alter table public.request_messages disable row level security;
 alter table public.agent_findings disable row level security;
 alter table public.agent_response_attachments disable row level security;
+alter table public.agent_security_tokens disable row level security;
 alter table public.agent_invites disable row level security;
 

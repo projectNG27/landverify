@@ -81,6 +81,11 @@ export function AgentDashboardShell({
           <p className="mt-1 text-sm text-[var(--lv-ink-muted)]">
             Signed in as <span className="font-medium text-[var(--lv-ink)]">{agentName}</span>
           </p>
+          <p className="mt-2">
+            <Link href="/agent/settings" className="text-sm font-semibold text-[var(--lv-primary)] hover:underline">
+              Account settings
+            </Link>
+          </p>
         </div>
       </div>
 

@@ -7,6 +7,10 @@ export type AgentRow = {
   id: string;
   full_name: string;
   username: string;
+  email: string | null;
+  phone: string | null;
+  whatsapp_number: string | null;
+  coverage_states: string[] | null;
   is_active: boolean;
   agent_onboarding_completed_at: string | null;
   agent_onboarding_policy_version: string | null;
@@ -18,7 +22,9 @@ export async function getAgentRowForSession(username: string): Promise<AgentRow 
   const supabase = getSupabaseAdminClient();
   const { data } = await supabase
     .from("agents")
-    .select("id, full_name, username, is_active, agent_onboarding_completed_at, agent_onboarding_policy_version, last_seen_at")
+    .select(
+      "id, full_name, username, email, phone, whatsapp_number, coverage_states, is_active, agent_onboarding_completed_at, agent_onboarding_policy_version, last_seen_at",
+    )
     .eq("username", username.toLowerCase())
     .maybeSingle();
   return (data as AgentRow | null) ?? null;
