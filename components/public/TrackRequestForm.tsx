@@ -106,7 +106,7 @@ export function TrackRequestForm() {
     <div className={liveOk ? "mx-auto max-w-2xl" : "mx-auto max-w-lg"}>
       <form
         onSubmit={form.handleSubmit(onSubmit)}
-        className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-card)] p-6 shadow-sm"
+        className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-card)] p-6 shadow-sm print:hidden"
         noValidate
       >
         <div className="space-y-4">
@@ -179,74 +179,76 @@ export function TrackRequestForm() {
 
       {(previewOk || liveOk) && (
         <div className="mt-8 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-card)] p-6 shadow-sm">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">
-            {liveOk ? "Current status" : "Status preview"}
-          </p>
-          <p className="mt-2 text-sm text-[var(--lv-ink-muted)]">
-            {liveOk ? (
-              <>
-                Request <span className="font-mono text-[var(--lv-ink)]">{result.request_id}</span> matched{" "}
-                <span className="font-medium text-[var(--lv-ink)]">{result.email_hint}</span>.{" "}
-                {result.timeline_detail ?? "Your latest status is available below."}
-              </>
-            ) : (
-              <>
-                We recognised <span className="font-mono text-[var(--lv-ink)]">{result.request_id}</span> with{" "}
-                <span className="font-medium text-[var(--lv-ink)]">{result.email_hint}</span>. Detailed payment and
-                verification stages will show here once tracking is fully online.
-              </>
-            )}
-          </p>
-          {!liveOk && (
-            <p className="mt-3 text-xs text-[var(--lv-ink-faint)]">
-              Below is a sample timeline — your actual step may differ once we record your request in our systems.
+          <div className="print:hidden">
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">
+              {liveOk ? "Current status" : "Status preview"}
             </p>
-          )}
-          <TimelinePreview activeIndex={activeIndex} />
-          {liveOk && result.payment_status ? (
-            <p className="mt-4 text-sm text-[var(--lv-ink-muted)]">
-              Payment:{" "}
-              <span className="font-semibold capitalize text-[var(--lv-ink)]">{result.payment_status}</span>
-              {String(result.payment_status).toLowerCase() !== "paid" ? (
+            <p className="mt-2 text-sm text-[var(--lv-ink-muted)]">
+              {liveOk ? (
                 <>
-                  {" · "}
-                  <Link
-                    href={`/pay?code=${encodeURIComponent(result.request_id)}`}
-                    className="font-semibold text-[var(--lv-primary)] underline-offset-2 hover:underline"
-                  >
-                    Pay online with Paystack
-                  </Link>
+                  Request <span className="font-mono text-[var(--lv-ink)]">{result.request_id}</span> matched{" "}
+                  <span className="font-medium text-[var(--lv-ink)]">{result.email_hint}</span>.{" "}
+                  {result.timeline_detail ?? "Your latest status is available below."}
                 </>
-              ) : null}
+              ) : (
+                <>
+                  We recognised <span className="font-mono text-[var(--lv-ink)]">{result.request_id}</span> with{" "}
+                  <span className="font-medium text-[var(--lv-ink)]">{result.email_hint}</span>. Detailed payment and
+                  verification stages will show here once tracking is fully online.
+                </>
+              )}
             </p>
-          ) : null}
-          {history ? (
-            <div className="mt-8 border-t border-[var(--lv-border)] pt-6">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">Activity log</p>
-              <ol className="mt-3 space-y-3">
-                {history.map((entry, idx) => (
-                  <li
-                    key={`${entry.created_at}-${idx}`}
-                    className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-muted)]/30 px-3 py-2 text-sm"
-                  >
-                    <p className="font-semibold text-[var(--lv-ink)]">{timelineLabelFromStatus(entry.status)}</p>
-                    <p className="mt-0.5 text-xs text-[var(--lv-ink-faint)]">{formatHistoryWhen(entry.created_at)}</p>
-                    {entry.note ? (
-                      <p className="mt-2 text-xs leading-relaxed text-[var(--lv-ink-muted)]">{entry.note}</p>
-                    ) : null}
-                  </li>
-                ))}
-              </ol>
-            </div>
-          ) : null}
-          {liveOk && lastTracked.current && result.ok && result.mode === "live" ? (
-            <TrackCaseMessagesPanel
-              requestId={lastTracked.current.request_id}
-              email={lastTracked.current.email}
-              messages={result.case_messages ?? []}
-              onAfterSend={refreshLiveTracking}
-            />
-          ) : null}
+            {!liveOk && (
+              <p className="mt-3 text-xs text-[var(--lv-ink-faint)]">
+                Below is a sample timeline — your actual step may differ once we record your request in our systems.
+              </p>
+            )}
+            <TimelinePreview activeIndex={activeIndex} />
+            {liveOk && result.payment_status ? (
+              <p className="mt-4 text-sm text-[var(--lv-ink-muted)]">
+                Payment:{" "}
+                <span className="font-semibold capitalize text-[var(--lv-ink)]">{result.payment_status}</span>
+                {String(result.payment_status).toLowerCase() !== "paid" ? (
+                  <>
+                    {" · "}
+                    <Link
+                      href={`/pay?code=${encodeURIComponent(result.request_id)}`}
+                      className="font-semibold text-[var(--lv-primary)] underline-offset-2 hover:underline"
+                    >
+                      Pay online with Paystack
+                    </Link>
+                  </>
+                ) : null}
+              </p>
+            ) : null}
+            {history ? (
+              <div className="mt-8 border-t border-[var(--lv-border)] pt-6">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">Activity log</p>
+                <ol className="mt-3 space-y-3">
+                  {history.map((entry, idx) => (
+                    <li
+                      key={`${entry.created_at}-${idx}`}
+                      className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-muted)]/30 px-3 py-2 text-sm"
+                    >
+                      <p className="font-semibold text-[var(--lv-ink)]">{timelineLabelFromStatus(entry.status)}</p>
+                      <p className="mt-0.5 text-xs text-[var(--lv-ink-faint)]">{formatHistoryWhen(entry.created_at)}</p>
+                      {entry.note ? (
+                        <p className="mt-2 text-xs leading-relaxed text-[var(--lv-ink-muted)]">{entry.note}</p>
+                      ) : null}
+                    </li>
+                  ))}
+                </ol>
+              </div>
+            ) : null}
+            {liveOk && lastTracked.current && result.ok && result.mode === "live" ? (
+              <TrackCaseMessagesPanel
+                requestId={lastTracked.current.request_id}
+                email={lastTracked.current.email}
+                messages={result.case_messages ?? []}
+                onAfterSend={refreshLiveTracking}
+              />
+            ) : null}
+          </div>
           {liveOk && lastTracked.current && result.ok && result.mode === "live" && result.receipt && result.full_name ? (
             <PaymentReceiptPanel
               requestId={lastTracked.current.request_id}

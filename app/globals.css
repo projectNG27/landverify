@@ -257,3 +257,31 @@ body {
   max-width: 100%;
   height: auto;
 }
+
+/* Formal receipt: hide chrome when printing from Track request */
+@media print {
+  html.lv-print-receipt-only {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  html.lv-print-receipt-only body * {
+    visibility: hidden !important;
+  }
+  html.lv-print-receipt-only #lv-payment-receipt,
+  html.lv-print-receipt-only #lv-payment-receipt * {
+    visibility: visible !important;
+  }
+  html.lv-print-receipt-only #lv-payment-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 12mm 14mm !important;
+    background: #fff !important;
+    color: #111 !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
+}

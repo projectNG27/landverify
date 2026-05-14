@@ -130,6 +130,13 @@ export async function startIntakePaystackCheckout(input: unknown): Promise<Payst
   if (insErr || !inserted) {
     console.error("startIntakePaystackCheckout insert failed", insErr);
     const raw = (insErr?.message ?? "").toLowerCase();
+    if (raw.includes("customer_email") || raw.includes("pgrst204")) {
+      return {
+        ok: false,
+        message:
+          "Supabase is missing Paystack columns on `payments` (e.g. customer_email). In the SQL Editor, run `supabase/migrations/20260513_paystack_payments.sql` or `20260515_payments_paystack_columns_sync.sql`, redeploy if needed, then try again.",
+      };
+    }
     const needsMigration =
       raw.includes("request_id") ||
       raw.includes("null value") ||

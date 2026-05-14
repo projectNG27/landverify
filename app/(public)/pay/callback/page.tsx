@@ -10,11 +10,28 @@ export const metadata: Metadata = {
 
 export const dynamic = "force-dynamic";
 
-type Props = { searchParams: Promise<{ reference?: string; trxref?: string }> };
+type Props = { searchParams: Promise<{ reference?: string | string[]; trxref?: string | string[] }> };
+
+function pickPaystackReference(sp: { reference?: string | string[]; trxref?: string | string[] }): string {
+  const one = (v: string | string[] | undefined): string => {
+    if (v == null) return "";
+    const raw = Array.isArray(v) ? v.find((x) => String(x).trim()) ?? "" : v;
+    const s = String(raw).trim();
+    if (!s) return "";
+    try {
+      return decodeURIComponent(s);
+    } catch {
+      return s;
+    }
+  };
+  const merged = one(sp.trxref) || one(sp.reference) || "";
+  const m = merged.match(/^(LVPAY-[A-F0-9]+)/i);
+  return m ? m[1].toUpperCase() : merged.trim();
+}
 
 export default async function PayCallbackPage({ searchParams }: Props) {
   const sp = await searchParams;
-  const reference = String(sp.reference || sp.trxref || "").trim();
+  const reference = pickPaystackReference(sp).trim();
 
   if (!reference) {
     return (

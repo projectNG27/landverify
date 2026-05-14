@@ -95,6 +95,40 @@ export async function paystackInitializeTransaction(params: {
   };
 }
 
+/**
+ * Verifies a transaction with Paystack, retrying briefly when Paystack has not indexed the charge yet
+ * (common right after redirect to callback — "Transaction reference not found").
+ */
+export async function paystackVerifyTransactionWithRetry(
+  reference: string,
+): Promise<{ ok: true; data: PaystackVerifySuccess } | { ok: false; message: string }> {
+  const ref = reference.trim();
+  if (!ref) return { ok: false, message: "Missing transaction reference." };
+
+  const delaysMs = [0, 400, 900, 1600, 2500];
+  let last: { ok: true; data: PaystackVerifySuccess } | { ok: false; message: string } = {
+    ok: false,
+    message: "Verification failed.",
+  };
+
+  for (let i = 0; i < delaysMs.length; i++) {
+    const wait = delaysMs[i];
+    if (wait > 0) {
+      await new Promise((r) => setTimeout(r, wait));
+    }
+    last = await paystackVerifyTransaction(ref);
+    if (last.ok) return last;
+    const msg = last.message.toLowerCase();
+    const retriable =
+      msg.includes("not found") ||
+      msg.includes("could not be found") ||
+      (msg.includes("reference") && msg.includes("not"));
+    if (!retriable) return last;
+  }
+
+  return last;
+}
+
 export async function paystackVerifyTransaction(
   reference: string,
 ): Promise<{ ok: true; data: PaystackVerifySuccess } | { ok: false; message: string }> {

@@ -1,5 +1,5 @@
 import { revalidatePath } from "next/cache";
-import { inferCardOrigin, paystackVerifyTransaction } from "@/lib/paystack";
+import { inferCardOrigin, paystackVerifyTransactionWithRetry } from "@/lib/paystack";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function revalidatePaymentSurfaces(requestCode: string | null) {
@@ -22,7 +22,7 @@ export type SettleResult =
  * Confirms a Paystack transaction and marks the request paid. Safe to call from webhook and callback (idempotent).
  */
 export async function settlePaystackReference(reference: string): Promise<SettleResult> {
-  const verify = await paystackVerifyTransaction(reference);
+  const verify = await paystackVerifyTransactionWithRetry(reference);
   if (!verify.ok) return verify;
 
   if (verify.data.status !== "success") {
