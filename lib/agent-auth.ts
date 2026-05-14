@@ -38,9 +38,9 @@ export async function listActiveAgents() {
   const supabase = getSupabaseAdminClient();
   const { data } = await supabase
     .from("agents")
-    .select("id, username, full_name")
+    .select("id, username, full_name, coverage_states")
     .eq("is_active", true)
     .order("full_name", { ascending: true });
-  return (data ?? []) as Array<{ id: string; username: string; full_name: string }>;
+  return (data ?? []) as Array<{ id: string; username: string; full_name: string; coverage_states: string[] | null }>;
 }
 

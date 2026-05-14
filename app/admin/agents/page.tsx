@@ -7,6 +7,7 @@ import { AdminCreateAgentInviteForm } from "@/components/admin/AdminCreateAgentI
 import { AdminPendingInviteRow } from "@/components/admin/AdminPendingInviteRow";
 import { getAdminSessionUser } from "@/lib/admin-auth";
 import { listActiveAgents } from "@/lib/agent-auth";
+import { formatCoverageStatesList } from "@/lib/agent-coverage";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
@@ -91,6 +92,9 @@ export default async function AdminAgentsPage() {
             <li key={a.id} className="rounded-lg border border-[var(--lv-border)] px-3 py-2 text-sm">
               <p className="font-semibold text-[var(--lv-ink)]">{a.full_name}</p>
               <p className="text-[var(--lv-ink-faint)]">{a.username}</p>
+              <p className="mt-1 text-xs text-[var(--lv-ink-muted)]">
+                Coverage: <span className="text-[var(--lv-ink)]">{formatCoverageStatesList(a.coverage_states)}</span>
+              </p>
             </li>
           ))}
           {agents.length === 0 ? <li className="text-sm text-[var(--lv-ink-faint)]">No agents created yet.</li> : null}

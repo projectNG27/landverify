@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
+import { AgentCoverageStateCheckboxes } from "@/components/agent/AgentCoverageStateCheckboxes";
 import { adminCreateAgentAction, type AdminAssignState } from "@/app/actions/admin-requests";
 
 const initialState: AdminAssignState = { ok: false };
@@ -41,6 +42,12 @@ export function AdminCreateAgentForm() {
           </label>
           <input id="agent_temp_password" className={inputClass} name="password" type="text" minLength={8} required />
         </div>
+      </div>
+      <div>
+        <AgentCoverageStateCheckboxes
+          legend="States this agent can cover"
+          description="Required. Same list as customer requests (Lagos, Ogun, Oyo, Osun)."
+        />
       </div>
       {state.error ? <p className="text-xs text-red-600">{state.error}</p> : null}
       {state.ok && state.success ? <p className="text-xs text-emerald-700">{state.success}</p> : null}

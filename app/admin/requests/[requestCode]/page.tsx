@@ -17,7 +17,7 @@ import type { StoredAttachment } from "@/lib/request-document-storage";
 import { formatRemaining } from "@/lib/db/sla";
 import { formatNgnFromKobo } from "@/lib/pricing";
 import { paymentChannelLabel } from "@/lib/payment-display";
-import { getActiveAgentOptions, getRequestDetailByCode } from "@/lib/db/manager-requests";
+import { getActiveAgentOptionsForRequest, getRequestDetailByCode } from "@/lib/db/manager-requests";
 
 export const metadata: Metadata = {
   title: "Request detail",
@@ -52,9 +52,9 @@ export default async function AdminRequestDetailPage({ params }: Props) {
   const { requestCode } = await params;
   const detail = await getRequestDetailByCode(requestCode);
   if (!detail.request) notFound();
-  const agents = await getActiveAgentOptions();
-
   const r = detail.request as RequestDetailRow;
+  const agentBuckets = await getActiveAgentOptionsForRequest(r.state);
+
   const requestId = String((detail.request as { id: string }).id);
   const supabase = getSupabaseAdminClient();
   const { data: agentRespRows } = await supabase
@@ -250,7 +250,12 @@ export default async function AdminRequestDetailPage({ params }: Props) {
 
         <aside className="space-y-4">
           <AdminPaymentStatusForm requestCode={r.request_code} defaultStatus={r.payment_status} />
-          <AdminAssignRequestForm requestCode={r.request_code} agents={agents} />
+          <AdminAssignRequestForm
+            requestCode={r.request_code}
+            requestState={r.state}
+            agentsMatchingState={agentBuckets.matchingState}
+            agentsOther={agentBuckets.otherAgents}
+          />
           <div className="rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-4">
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Status workflow</p>
             <div className="mt-3">

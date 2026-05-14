@@ -4,6 +4,7 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hashAgentPassword } from "@/lib/agent-auth";
+import { parseCoverageStatesFromForm } from "@/lib/agent-coverage";
 import {
   buildSignedAgentInviteUrl,
   hashAgentInviteToken,
@@ -167,6 +168,11 @@ export async function registerAgentWithInviteAction(_: AgentRegisterState, formD
   if (password.length < 8) return { ok: false, error: "Password should be at least 8 characters." };
   if (password !== password2) return { ok: false, error: "Passwords do not match." };
 
+  const coverage_states = parseCoverageStatesFromForm(formData);
+  if (coverage_states.length < 1) {
+    return { ok: false, error: "Select at least one state you can represent for LandVerify." };
+  }
+
   const supabase = getSupabaseAdminClient();
   const inviteId = looked.invite.inviteId;
 
@@ -193,6 +199,7 @@ export async function registerAgentWithInviteAction(_: AgentRegisterState, formD
       password_hash: hashAgentPassword(password),
       phone: phoneDigits,
       whatsapp_number: whatsappDigits,
+      coverage_states,
       is_active: true,
       agent_onboarding_completed_at: now,
       agent_onboarding_policy_version: CURRENT_AGENT_ONBOARDING_POLICY,

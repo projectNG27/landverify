@@ -2,6 +2,9 @@ import { formatRemaining } from "@/lib/db/sla";
 import type { RequestStatus } from "@/lib/db/request-status";
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { listActiveAgents } from "@/lib/agent-auth";
+import { agentCoversRequestState } from "@/lib/agent-coverage";
+
+export type AgentOptionRow = { id: string; username: string; full_name: string; coverage_states: string[] };
 
 export type ManagerRequestSummary = {
   id: string;
@@ -114,8 +117,20 @@ export async function getManagerRequestMetrics() {
   return metrics;
 }
 
-export async function getActiveAgentOptions() {
-  return listActiveAgents();
+export async function getActiveAgentOptionsForRequest(requestState: string): Promise<{
+  matchingState: AgentOptionRow[];
+  otherAgents: AgentOptionRow[];
+}> {
+  const rows = await listActiveAgents();
+  const agents: AgentOptionRow[] = rows.map((r) => ({
+    id: r.id,
+    username: r.username,
+    full_name: r.full_name,
+    coverage_states: Array.isArray(r.coverage_states) ? r.coverage_states : [],
+  }));
+  const matchingState = agents.filter((a) => agentCoversRequestState(a.coverage_states, requestState));
+  const otherAgents = agents.filter((a) => !agentCoversRequestState(a.coverage_states, requestState));
+  return { matchingState, otherAgents };
 }
 
 /** When a manager opens the request detail page, mark new requester case messages as read. */

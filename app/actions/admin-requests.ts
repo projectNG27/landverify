@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { hashAgentPassword } from "@/lib/agent-auth";
+import { parseCoverageStatesFromForm } from "@/lib/agent-coverage";
 import { getAdminSessionUser } from "@/lib/admin-auth";
 import type { RequestStatus } from "@/lib/db/request-status";
 import { sendMailgunEmail, isMailgunConfigured } from "@/lib/mailgun";
@@ -179,12 +180,18 @@ export async function adminCreateAgentAction(_: AdminAssignState, formData: Form
   if (username.length < 3) return { ok: false, error: "Username should be at least 3 chars." };
   if (password.length < 8) return { ok: false, error: "Password should be at least 8 chars." };
 
+  const coverage_states = parseCoverageStatesFromForm(formData);
+  if (coverage_states.length < 1) {
+    return { ok: false, error: "Select at least one state this agent can cover." };
+  }
+
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase.from("agents").insert({
     full_name: fullName,
     email,
     username,
     password_hash: hashAgentPassword(password),
+    coverage_states,
     is_active: true,
   });
   if (error) return { ok: false, error: "Could not create agent. Username/email may already exist." };

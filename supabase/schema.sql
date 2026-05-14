@@ -68,12 +68,16 @@ create table if not exists public.agents (
   full_name text not null,
   phone text,
   whatsapp_number text,
+  coverage_states text[] not null default '{}',
   is_active boolean not null default true,
   agent_onboarding_completed_at timestamptz,
   agent_onboarding_policy_version text,
   last_seen_at timestamptz,
   created_at timestamptz not null default now()
 );
+
+create index if not exists agents_coverage_states_gin_idx
+  on public.agents using gin (coverage_states);
 
 create table if not exists public.agent_invites (
   id uuid primary key default gen_random_uuid(),

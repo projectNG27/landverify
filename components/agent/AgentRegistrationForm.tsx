@@ -3,6 +3,7 @@
 import { useActionState } from "react";
 import Link from "next/link";
 import { registerAgentWithInviteAction, type AgentRegisterState } from "@/app/actions/agent-invite";
+import { AgentCoverageStateCheckboxes } from "@/components/agent/AgentCoverageStateCheckboxes";
 
 const initial: AgentRegisterState = { ok: false };
 
@@ -88,6 +89,11 @@ export function AgentRegistrationForm({
           <input id="reg_password2" name="password_confirm" type="password" className={inputClass} required minLength={8} autoComplete="new-password" />
         </div>
       </div>
+
+      <AgentCoverageStateCheckboxes
+        legend="States you can represent"
+        description="Select every state where you can reliably perform verification work. Managers use this to match you to requests."
+      />
 
       <div>
         <h3 className="text-sm font-semibold text-[var(--lv-ink)]">Agent standards</h3>
