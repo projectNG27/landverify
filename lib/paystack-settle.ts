@@ -3,14 +3,30 @@ import { inferCardOrigin, paystackVerifyTransactionWithRetry } from "@/lib/payst
 import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 
 function revalidatePaymentSurfaces(requestCode: string | null) {
-  revalidatePath("/track-request");
-  revalidatePath("/pay");
-  revalidatePath("/pay/callback");
-  revalidatePath("/submit-request");
-  revalidatePath("/admin");
-  revalidatePath("/admin/requests");
-  if (requestCode) {
-    revalidatePath(`/admin/requests/${requestCode}`);
+  const paths = [
+    "/track-request",
+    "/pay",
+    "/pay/callback",
+    "/submit-request",
+    "/admin",
+    "/admin/requests",
+    ...(requestCode ? [`/admin/requests/${requestCode}`] : []),
+  ];
+  for (const p of paths) {
+    try {
+      revalidatePath(p);
+    } catch (e) {
+      console.warn("revalidatePath skipped:", p, e);
+    }
+  }
+}
+
+/** Ensures metadata is JSON-serializable for PostgREST (Paystack payloads can include odd values). */
+function jsonbSafe(value: unknown): unknown {
+  try {
+    return JSON.parse(JSON.stringify(value));
+  } catch {
+    return { serialization: "failed", at: new Date().toISOString() };
   }
 }
 
@@ -51,7 +67,7 @@ export async function settlePaystackReference(reference: string): Promise<Settle
       : {};
   const meta: Record<string, unknown> = {
     ...prevMeta,
-    paystack_verify: verify.data,
+    paystack_verify: jsonbSafe(verify.data),
     card_origin: cardOrigin,
   };
 
@@ -125,12 +141,15 @@ export async function settlePaystackReference(reference: string): Promise<Settle
           ? verify.data.channel ?? "Non-card channel"
           : "Card region unknown";
 
-  await supabase.from("request_status_events").insert({
+  const { error: evtErr } = await supabase.from("request_status_events").insert({
     request_id: payRow.request_id,
     status: req.status,
     note: `Paystack payment confirmed. ${originLabel}.`,
     actor: "system",
   });
+  if (evtErr) {
+    console.warn("settlePaystackReference status event insert failed", evtErr.message);
+  }
 
   revalidatePaymentSurfaces(requestCode);
   return { ok: true, requestCode };

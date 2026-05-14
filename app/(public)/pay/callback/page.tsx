@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { redirect } from "next/navigation";
+import { PaymentIntakeRedirect } from "@/components/public/PaymentIntakeRedirect";
 import { settlePaystackReference } from "@/lib/paystack-settle";
 
 export const metadata: Metadata = {
@@ -9,6 +9,7 @@ export const metadata: Metadata = {
 };
 
 export const dynamic = "force-dynamic";
+export const runtime = "nodejs";
 
 type Props = { searchParams: Promise<{ reference?: string | string[]; trxref?: string | string[] }> };
 
@@ -54,7 +55,9 @@ export default async function PayCallbackPage({ searchParams }: Props) {
   const result = await settlePaystackReference(reference);
 
   if (result.ok && result.intakeCheckout) {
-    redirect(`/submit-request?payment_ref=${encodeURIComponent(reference)}`);
+    return (
+      <PaymentIntakeRedirect href={`/submit-request?payment_ref=${encodeURIComponent(reference)}`} />
+    );
   }
 
   if (!result.ok) {
