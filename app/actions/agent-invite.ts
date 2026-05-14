@@ -214,11 +214,16 @@ export async function registerAgentWithInviteAction(_: AgentRegisterState, formD
     if (insertErr?.code === "23505" || raw.includes("duplicate")) {
       return { ok: false, error: "That username or email is already registered." };
     }
-    if (raw.includes("coverage_states") || (raw.includes("column") && raw.includes("does not exist"))) {
+    const schemaOutOfDate =
+      raw.includes("schema cache") ||
+      (raw.includes("could not find") && raw.includes("column")) ||
+      raw.includes("does not exist") ||
+      raw.includes("pgrst204");
+    if (schemaOutOfDate) {
       return {
         ok: false,
         error:
-          "Registration cannot complete yet: the database is missing the latest update (agents.coverage_states). Ask your administrator to run migrations, then use the same invite link again.",
+          "Your Supabase database is missing columns the app needs on the agents table (for example agent onboarding or coverage states). Open Supabase → SQL Editor and run your project migrations from supabase/migrations (at minimum 20260516_agent_onboarding_and_response_attachments.sql and 20260520_agents_coverage_states.sql), or run 20260521_agents_schema_catchup.sql for an idempotent bundle. Wait a few seconds, then submit again — your invite link still works.",
       };
     }
     return {
