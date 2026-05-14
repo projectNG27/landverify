@@ -140,7 +140,7 @@ export async function paystackVerifyTransaction(
     cache: "no-store",
   });
 
-  const json = (await res.json()) as {
+  let json: {
     status: boolean;
     message: string;
     data?: {
@@ -154,6 +154,11 @@ export async function paystackVerifyTransaction(
       gateway_response?: string;
     };
   };
+  try {
+    json = (await res.json()) as typeof json;
+  } catch {
+    return { ok: false, message: `Paystack verify returned unreadable data (HTTP ${res.status}).` };
+  }
 
   if (!json.status || !json.data) {
     return { ok: false, message: json.message || "Verification failed." };

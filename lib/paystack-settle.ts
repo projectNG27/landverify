@@ -38,6 +38,15 @@ export type SettleResult =
  * Confirms a Paystack transaction and marks the request paid. Safe to call from webhook and callback (idempotent).
  */
 export async function settlePaystackReference(reference: string): Promise<SettleResult> {
+  try {
+    return await settlePaystackReferenceInner(reference);
+  } catch (e) {
+    console.error("settlePaystackReference", e);
+    return { ok: false, message: "Could not confirm payment with our server. Try again in a moment." };
+  }
+}
+
+async function settlePaystackReferenceInner(reference: string): Promise<SettleResult> {
   const verify = await paystackVerifyTransactionWithRetry(reference);
   if (!verify.ok) return verify;
 
@@ -56,7 +65,9 @@ export async function settlePaystackReference(reference: string): Promise<Settle
     return { ok: false, message: "No payment record matches this reference." };
   }
 
-  if (Number(payRow.amount_kobo) !== verify.data.amount) {
+  const quotedKobo = Number(payRow.amount_kobo as unknown as string | number | bigint);
+  const paidKobo = Number(verify.data.amount as unknown as string | number);
+  if (quotedKobo !== paidKobo) {
     return { ok: false, message: "Paid amount does not match the recorded quote." };
   }
 
@@ -154,3 +165,4 @@ export async function settlePaystackReference(reference: string): Promise<Settle
   revalidatePaymentSurfaces(requestCode);
   return { ok: true, requestCode };
 }
+
