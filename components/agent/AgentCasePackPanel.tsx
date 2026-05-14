@@ -7,6 +7,8 @@ export type CasePackFinding = { section_key: string; findings: string };
 export type CasePackMessage = { sender_name: string; message_body: string; created_at: string };
 
 type Props = {
+  /** Canonical task URL (server-provided) so .txt / copy always include a valid link, even before client hydration. */
+  taskAbsoluteUrl: string;
   requestCode: string;
   productId: string;
   status: string;
@@ -22,17 +24,24 @@ type Props = {
 
 const MAX_SHARE_CHARS = 3600;
 
-function truncateForShare(body: string): string {
-  if (body.length <= MAX_SHARE_CHARS) return body;
-  return `${body.slice(0, MAX_SHARE_CHARS - 40)}\n\n…(truncated — open full case in LandVerify.)`;
+/** Keeps the start (case metadata + early findings) and the tail (documents + footers) for WhatsApp / email limits. */
+function truncateForShare(body: string, max = MAX_SHARE_CHARS): string {
+  if (body.length <= max) return body;
+  const sep = "\n\n…(middle of this pack omitted — open the LandVerify task link at the end for the full text)…\n\n";
+  const budget = max - sep.length;
+  if (budget < 900) {
+    return `${body.slice(0, max - 80)}\n\n…(truncated — use Copy all or Download .txt in LandVerify for the full pack.)`;
+  }
+  const headLen = Math.floor(budget * 0.42);
+  const tailLen = budget - headLen;
+  return `${body.slice(0, headLen)}${sep}${body.slice(body.length - tailLen)}`;
 }
 
-function siteOrigin(): string {
-  if (typeof window === "undefined") return "";
-  return window.location.origin;
-}
+const PACK_DISCLAIMER =
+  "LandVerify provides professional land verification insights — not government title proof.";
 
 export function AgentCasePackPanel({
+  taskAbsoluteUrl,
   requestCode,
   productId,
   status,
@@ -50,6 +59,8 @@ export function AgentCasePackPanel({
   const fullText = useMemo(() => {
     const lines: string[] = [
       "LandVerify — case pack (for official / ministry correspondence)",
+      PACK_DISCLAIMER,
+      "",
       `Case ID: ${requestCode}`,
       `Product tier: ${productId}`,
       `Status: ${status.replace(/_/g, " ")}`,
@@ -85,10 +96,12 @@ export function AgentCasePackPanel({
       }
       lines.push("");
     }
-    lines.push(`Source: ${siteOrigin()}/agent/tasks/${requestCode}`);
-    lines.push("LandVerify provides professional land verification insights — not government title proof.");
+    lines.push("— Source & legal —");
+    lines.push(`Open this case in LandVerify (refresh the page if a download link expired): ${taskAbsoluteUrl}`);
+    lines.push(PACK_DISCLAIMER);
     return lines.filter(Boolean).join("\n");
   }, [
+    taskAbsoluteUrl,
     requestCode,
     productId,
     status,
@@ -135,14 +148,14 @@ export function AgentCasePackPanel({
       await nav.share({
         title: `LandVerify ${requestCode}`,
         text: shareText,
-        url: `${siteOrigin()}/agent/tasks/${requestCode}`,
+        url: taskAbsoluteUrl,
       });
     } catch (e) {
       if ((e as Error).name === "AbortError") return;
       setCopyMsg("Could not open share.");
       window.setTimeout(() => setCopyMsg(null), 3000);
     }
-  }, [requestCode, shareText]);
+  }, [requestCode, shareText, taskAbsoluteUrl]);
 
   const waHref = useMemo(
     () => `https://wa.me/?text=${encodeURIComponent(shareText)}`,
@@ -154,7 +167,7 @@ export function AgentCasePackPanel({
     return `mailto:?subject=${subj}&body=${body}`;
   }, [requestCode, shareText]);
   const smsHref = useMemo(() => {
-    const body = encodeURIComponent(truncateForShare(fullText.slice(0, 1200)));
+    const body = encodeURIComponent(truncateForShare(fullText, 1180));
     return `sms:?body=${body}`;
   }, [fullText]);
 
@@ -162,8 +175,9 @@ export function AgentCasePackPanel({
     <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-4 shadow-sm sm:p-5">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Case pack & share</h2>
       <p className="mt-2 text-sm leading-relaxed text-[var(--lv-ink-muted)]">
-        Build a single text summary with links (good for email, WhatsApp, or ministry follow-up). Download works offline;
-        links expire — refresh this page if downloads fail.
+        <strong>Copy all</strong> and <strong>Download .txt</strong> include findings, messages, signed file links, and
+        the legal footer. WhatsApp, Email, and SMS may shorten long cases but keep the <strong>end of the pack</strong>{" "}
+        (documents + disclaimer) when possible. Refresh this task if a link expired.
       </p>
 
       {copyMsg ? (
@@ -172,25 +186,25 @@ export function AgentCasePackPanel({
         </p>
       ) : null}
 
-      <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-3">
+      <div className="mt-4 grid grid-cols-2 gap-2.5 sm:grid-cols-3 sm:gap-3">
         <button
           type="button"
           onClick={() => void copyAll()}
-          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 px-2 text-xs font-semibold text-[var(--lv-ink)] hover:bg-[var(--lv-muted)]/70"
+          className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 px-2 text-xs font-semibold text-[var(--lv-ink)] shadow-sm hover:bg-[var(--lv-muted)]/70 active:scale-[0.99]"
         >
           Copy all
         </button>
         <button
           type="button"
           onClick={downloadTxt}
-          className="inline-flex min-h-12 items-center justify-center rounded-xl bg-[var(--lv-primary)] px-2 text-xs font-semibold text-white shadow-sm hover:opacity-95"
+          className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl bg-[var(--lv-primary)] px-2 text-xs font-semibold text-white shadow-sm hover:opacity-95 active:scale-[0.99]"
         >
           Download .txt
         </button>
         <button
           type="button"
           onClick={() => void shareNative()}
-          className="col-span-2 inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--lv-primary)] px-2 text-xs font-semibold text-[var(--lv-primary)] hover:bg-[var(--lv-primary)]/10 sm:col-span-1"
+          className="col-span-2 inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border-2 border-[var(--lv-primary)] px-2 text-xs font-semibold text-[var(--lv-primary)] hover:bg-[var(--lv-primary)]/10 active:scale-[0.99] sm:col-span-1"
         >
           Share…
         </button>
@@ -198,19 +212,19 @@ export function AgentCasePackPanel({
           href={waHref}
           target="_blank"
           rel="noopener noreferrer"
-          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] px-2 text-center text-xs font-semibold text-[var(--lv-ink)] hover:bg-[var(--lv-muted)]/50"
+          className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] px-2 text-center text-xs font-semibold text-[var(--lv-ink)] shadow-sm hover:bg-[var(--lv-muted)]/50 active:scale-[0.99]"
         >
           WhatsApp
         </a>
         <a
           href={mailHref}
-          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] px-2 text-center text-xs font-semibold text-[var(--lv-ink)] hover:bg-[var(--lv-muted)]/50"
+          className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] px-2 text-center text-xs font-semibold text-[var(--lv-ink)] shadow-sm hover:bg-[var(--lv-muted)]/50 active:scale-[0.99]"
         >
           Email
         </a>
         <a
           href={smsHref}
-          className="inline-flex min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] px-2 text-center text-xs font-semibold text-[var(--lv-ink)] hover:bg-[var(--lv-muted)]/50"
+          className="inline-flex min-h-[3.25rem] items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] px-2 text-center text-xs font-semibold text-[var(--lv-ink)] shadow-sm hover:bg-[var(--lv-muted)]/50 active:scale-[0.99]"
         >
           SMS
         </a>

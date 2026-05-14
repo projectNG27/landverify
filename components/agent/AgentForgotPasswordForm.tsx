@@ -33,9 +33,12 @@ export function AgentForgotPasswordForm() {
         </p>
       ) : null}
       {state.success ? (
-        <p className="mt-4 rounded-lg border border-emerald-400/40 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-100">
-          {state.success}
-        </p>
+        <div className="mt-4 space-y-2 rounded-lg border border-emerald-400/40 bg-emerald-50/90 px-3 py-2 text-sm text-emerald-950 dark:border-emerald-800/40 dark:bg-emerald-950/30 dark:text-emerald-100">
+          <p>{state.success}</p>
+          <p className="text-xs text-emerald-900/90 dark:text-emerald-100/85">
+            If nothing arrives in a minute, check <strong>Spam</strong> or <strong>Promotions</strong> — password-reset mail often lands there.
+          </p>
+        </div>
       ) : null}
       <button
         type="submit"

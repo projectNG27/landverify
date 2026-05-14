@@ -235,7 +235,7 @@ export default async function AdminRequestDetailPage({ params }: Props) {
                       target="_blank"
                       rel="noopener noreferrer"
                       className="min-w-0 flex-1 font-medium text-[var(--lv-primary)] underline-offset-2 hover:underline"
-                      download={link.filename}
+                      title="Opens in a new tab"
                     >
                       {link.filename}
                     </a>

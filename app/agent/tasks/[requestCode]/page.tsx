@@ -11,6 +11,7 @@ import { getAgentSessionUser } from "@/lib/admin-auth";
 import { agentNeedsOnboarding, getAgentRowForSession } from "@/lib/agent-profile";
 import { formatRemaining } from "@/lib/db/sla";
 import { normalizeDocumentNames } from "@/lib/document-names";
+import { siteBaseUrl } from "@/lib/agent-invite";
 import { parseStoredAttachments, signAttachmentDownloadUrls } from "@/lib/request-document-storage";
 import type { StoredAttachment } from "@/lib/request-document-storage";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -90,6 +91,8 @@ export default async function AgentTaskPage({ params }: Props) {
   const coordsLine =
     request.coordinates_lat && request.coordinates_lng ? `${request.coordinates_lat}, ${request.coordinates_lng}` : null;
 
+  const taskAbsoluteUrl = `${siteBaseUrl()}/agent/tasks/${encodeURIComponent(requestCode)}`;
+
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6 sm:max-w-5xl sm:px-6 sm:pb-14 sm:pt-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -125,6 +128,7 @@ export default async function AgentTaskPage({ params }: Props) {
 
       <div className="mt-6 space-y-6">
         <AgentCasePackPanel
+          taskAbsoluteUrl={taskAbsoluteUrl}
           requestCode={String(request.request_code)}
           productId={String(request.product_id)}
           status={String(request.status)}
@@ -171,7 +175,7 @@ export default async function AgentTaskPage({ params }: Props) {
                 <Suspense fallback={<p className="text-sm text-[var(--lv-ink-faint)]">Loading files…</p>}>
                   <RequestAttachmentDownloads
                     attachments={(request as { document_attachments?: unknown }).document_attachments}
-                    intro="Download customer uploads. Links expire after about an hour — refresh if needed."
+                    intro="Tap a filename to open the file in a new tab. Allow pop-ups if your browser blocks signed links. Links expire after about an hour — refresh this page if a link fails."
                   />
                 </Suspense>
               </div>

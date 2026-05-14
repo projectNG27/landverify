@@ -44,7 +44,7 @@ export async function RequestAttachmentDownloads({ attachments, intro }: Props) 
               target="_blank"
               rel="noopener noreferrer"
               className="min-w-0 flex-1 font-medium text-[var(--lv-primary)] underline-offset-2 hover:underline"
-              download={link.filename}
+              title="Opens the file in a new tab (signed link)"
             >
               {link.filename}
             </a>
@@ -53,7 +53,8 @@ export async function RequestAttachmentDownloads({ attachments, intro }: Props) 
         ))}
       </ul>
       <p className="text-xs text-[var(--lv-ink-faint)]">
-        Links expire after about an hour. Refresh this page for new links.
+        Tap a filename to open in a <strong>new tab</strong>. Allow pop-ups if the browser blocks it. Links expire after
+        about an hour — refresh this page for new links.
       </p>
     </div>
   );

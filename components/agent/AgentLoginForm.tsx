@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { agentLoginAction, type AgentAuthState } from "@/app/actions/agent-auth";
 
 const initialState: AgentAuthState = { ok: false };
@@ -10,6 +10,9 @@ const inputClass =
 
 export function AgentLoginForm() {
   const [state, action, pending] = useActionState(agentLoginAction, initialState);
+  const [showPassword, setShowPassword] = useState(false);
+  const passwordType = showPassword ? "text" : "password";
+
   return (
     <form action={action} className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-6 shadow-sm">
       <div>
@@ -27,7 +30,23 @@ export function AgentLoginForm() {
             Forgot password?
           </Link>
         </div>
-        <input id="agent-password" name="password" type="password" className={inputClass} autoComplete="current-password" required />
+        <input
+          id="agent-password"
+          name="password"
+          type={passwordType}
+          className={inputClass}
+          autoComplete="current-password"
+          required
+        />
+        <label className="mt-2 flex cursor-pointer items-center gap-2 text-sm text-[var(--lv-ink-muted)]">
+          <input
+            type="checkbox"
+            checked={showPassword}
+            onChange={(e) => setShowPassword(e.target.checked)}
+            className="h-4 w-4 rounded border-[var(--lv-border)] text-[var(--lv-primary)] focus:ring-[var(--lv-primary)]"
+          />
+          Show password
+        </label>
       </div>
       {state.error ? <p className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-800">{state.error}</p> : null}
       <button

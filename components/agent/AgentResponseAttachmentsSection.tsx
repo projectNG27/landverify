@@ -19,7 +19,8 @@ export function AgentResponseAttachmentsSection({ requestCode, links }: { reques
     <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-4 shadow-sm sm:p-5">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Your attachments</h2>
       <p className="mt-2 text-sm text-[var(--lv-ink-muted)]">
-        PDF or images (max 5 per upload, 5 MB each). Managers see these on the request.
+        PDF or images (max 5 per upload, 5 MB each). Managers see these on the request. Tap a file to open it in a new
+        tab; allow pop-ups if your browser blocks signed links.
       </p>
 
       {links.length > 0 ? (
@@ -31,7 +32,7 @@ export function AgentResponseAttachmentsSection({ requestCode, links }: { reques
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex min-h-11 items-center justify-between gap-2 rounded-lg border border-[var(--lv-border)] bg-[var(--lv-muted)]/25 px-3 py-2 text-sm font-medium text-[var(--lv-primary)] underline-offset-2 hover:underline"
-                download={l.filename}
+                title="Opens in a new tab"
               >
                 <span className="min-w-0 truncate">{l.filename}</span>
                 <span className="shrink-0 text-xs text-[var(--lv-ink-faint)]">{Math.max(1, Math.round(l.size / 1024))} KB</span>

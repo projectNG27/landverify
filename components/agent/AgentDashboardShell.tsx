@@ -74,8 +74,8 @@ export function AgentDashboardShell({
         </div>
       ) : null}
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div>
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] px-4 py-4 shadow-sm sm:px-5 sm:py-5">
+        <div className="min-w-0">
           <p className="text-sm font-semibold text-[var(--lv-primary)]">LandVerify · Agent</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight text-[var(--lv-ink)]">Your queue</h1>
           <p className="mt-1 text-sm text-[var(--lv-ink-muted)]">
@@ -95,7 +95,7 @@ export function AgentDashboardShell({
             key={t.id}
             type="button"
             onClick={() => setTab(t.id)}
-            className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition min-h-11 sm:min-h-10 ${
+            className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition min-h-11 sm:min-h-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lv-primary)] ${
               tab === t.id
                 ? "bg-[var(--lv-primary)] text-white shadow-sm"
                 : "border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 text-[var(--lv-ink)] hover:bg-[var(--lv-muted)]/70"
