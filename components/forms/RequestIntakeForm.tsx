@@ -84,6 +84,91 @@ const defaultValues: RequestIntakeFormValues = {
   website: "",
 };
 
+/** Pay-first: persist partial form in this browser before redirecting to Paystack; keyed by `LVPAY-*` reference. */
+const intakePayDraftStorageKey = (reference: string) => `lv_intake_pay_draft:v1:${reference}`;
+
+type IntakePayDraftStoredV1 = {
+  v: 1;
+  savedAt: number;
+  paymentServiceConsent: boolean;
+  fields: Partial<
+    Pick<
+      RequestIntakeFormValues,
+      | "full_name"
+      | "email"
+      | "phone"
+      | "whatsapp_number"
+      | "product_id"
+      | "state"
+      | "lga"
+      | "land_location_description"
+      | "google_maps_link"
+      | "coordinates"
+      | "seller_name"
+      | "seller_phone"
+      | "additional_notes"
+      | "consent"
+    >
+  >;
+};
+
+/** Restore order: state before LGA so dependent options stay valid after one paint. */
+const INTAKE_PAY_DRAFT_FIELD_ORDER = [
+  "full_name",
+  "phone",
+  "whatsapp_number",
+  "state",
+  "lga",
+  "land_location_description",
+  "google_maps_link",
+  "coordinates",
+  "seller_name",
+  "seller_phone",
+  "additional_notes",
+  "consent",
+] as const satisfies readonly (keyof RequestIntakeFormValues)[];
+
+function parseIntakePayDraft(raw: string): IntakePayDraftStoredV1 | null {
+  try {
+    const o = JSON.parse(raw) as unknown;
+    if (!o || typeof o !== "object") return null;
+    const rec = o as Record<string, unknown>;
+    if (rec.v !== 1 || !rec.fields || typeof rec.fields !== "object") return null;
+    return {
+      v: 1,
+      savedAt: typeof rec.savedAt === "number" ? rec.savedAt : 0,
+      paymentServiceConsent: Boolean(rec.paymentServiceConsent),
+      fields: rec.fields as IntakePayDraftStoredV1["fields"],
+    };
+  } catch {
+    return null;
+  }
+}
+
+function buildIntakePayDraft(v: RequestIntakeFormValues, paymentServiceConsent: boolean): IntakePayDraftStoredV1 {
+  return {
+    v: 1,
+    savedAt: Date.now(),
+    paymentServiceConsent,
+    fields: {
+      full_name: v.full_name,
+      email: v.email,
+      phone: v.phone,
+      whatsapp_number: v.whatsapp_number,
+      product_id: v.product_id,
+      state: v.state,
+      lga: v.lga,
+      land_location_description: v.land_location_description,
+      google_maps_link: v.google_maps_link,
+      coordinates: v.coordinates,
+      seller_name: v.seller_name,
+      seller_phone: v.seller_phone,
+      additional_notes: v.additional_notes,
+      consent: v.consent,
+    },
+  };
+}
+
 type RequestIntakeFormProps = {
   captchaA: number;
   captchaB: number;
@@ -119,6 +204,7 @@ export function RequestIntakeForm({
   }>(null);
   const [payBusy, setPayBusy] = useState(false);
   const [paymentRefMessage, setPaymentRefMessage] = useState<string | null>(null);
+  const [intakeDraftRestored, setIntakeDraftRestored] = useState(false);
   const router = useRouter();
   const searchParams = useSearchParams();
   const [success, setSuccess] = useState<null | { mode: "preview" | "live"; requestId?: string; email: string }>(null);
@@ -186,7 +272,35 @@ export function RequestIntakeForm({
           tierLabel: s.tierLabel,
           amountDisplay: s.amountDisplay,
         });
+
+        let restored = false;
+        try {
+          const raw = typeof sessionStorage !== "undefined" ? sessionStorage.getItem(intakePayDraftStorageKey(ref)) : null;
+          if (raw) {
+            const draft = parseIntakePayDraft(raw);
+            if (draft) {
+              for (const key of INTAKE_PAY_DRAFT_FIELD_ORDER) {
+                const val = draft.fields[key];
+                if (val === undefined) continue;
+                if (val === "" && key !== "consent") continue;
+                if (key === "consent") {
+                  setValue("consent", Boolean(val), { shouldDirty: true, shouldValidate: false });
+                } else {
+                  setValue(key, val as string, { shouldDirty: true, shouldValidate: false });
+                }
+              }
+              setPaymentServiceConsent(draft.paymentServiceConsent);
+              restored = true;
+            }
+          }
+        } catch {
+          /* sessionStorage blocked */
+        }
+
         setValue("product_id", s.productId, { shouldValidate: true, shouldDirty: true });
+        setValue("email", s.emailHint, { shouldValidate: true, shouldDirty: true });
+        clearErrors();
+        setIntakeDraftRestored(restored);
         router.replace("/submit-request", { scroll: false });
       } else {
         setPaymentRefMessage(s.message);
@@ -195,7 +309,7 @@ export function RequestIntakeForm({
     return () => {
       cancelled = true;
     };
-  }, [paymentRefParam, payFirstLive, router, setValue]);
+  }, [paymentRefParam, payFirstLive, router, setValue, clearErrors]);
 
   useEffect(() => {
     const previous = previousStateRef.current;
@@ -236,6 +350,7 @@ export function RequestIntakeForm({
     setPaymentServiceConsent(false);
     setIntakePayment(null);
     setPaymentRefMessage(null);
+    setIntakeDraftRestored(false);
     reset(defaultValues);
     if (fileInputRef.current) fileInputRef.current.value = "";
     router.refresh();
@@ -313,6 +428,14 @@ export function RequestIntakeForm({
         setRootMessage("Paystack did not return a checkout link. Check Vercel logs and your Paystack dashboard.");
         return;
       }
+      try {
+        sessionStorage.setItem(
+          intakePayDraftStorageKey(res.reference),
+          JSON.stringify(buildIntakePayDraft(getValues(), paymentServiceConsent)),
+        );
+      } catch {
+        /* private mode / quota — checkout still works */
+      }
       window.location.assign(url);
     } catch (e) {
       setRootMessage(
@@ -380,6 +503,8 @@ export function RequestIntakeForm({
       }
     }
 
+    const paidRefForDraft = payFirstLive ? intakePayment?.reference : undefined;
+
     const result = await submitRequestIntake(fd);
 
     if (!result.ok) {
@@ -400,8 +525,16 @@ export function RequestIntakeForm({
     }
 
     const submittedEmail = values.email.trim();
+    if (paidRefForDraft) {
+      try {
+        sessionStorage.removeItem(intakePayDraftStorageKey(paidRefForDraft));
+      } catch {
+        /* ignore */
+      }
+    }
     setIntakePayment(null);
     setPaymentServiceConsent(false);
+    setIntakeDraftRestored(false);
     setSuccess({ mode: result.mode, requestId: result.request_id, email: submittedEmail });
     reset(defaultValues);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -641,6 +774,12 @@ export function RequestIntakeForm({
                       {intakePayment.tierLabel} ({intakePayment.amountDisplay}). Use the same email you paid with; it
                       should match <span className="font-mono font-medium">{intakePayment.emailHint}</span>.
                     </p>
+                    {intakeDraftRestored ? (
+                      <p className="mt-2 text-green-900/85 dark:text-green-100/85">
+                        We restored the details you had entered on this device before Paystack (except files — re-attach
+                        documents if you had chosen any).
+                      </p>
+                    ) : null}
                   </div>
                 ) : (
                   <button

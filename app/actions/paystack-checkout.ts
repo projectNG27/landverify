@@ -9,7 +9,7 @@ import { isPaystackConfigured, paystackInitializeTransaction } from "@/lib/payst
 import { trackRequestSchema } from "@/lib/validations/track-request";
 
 export type PaystackCheckoutResult =
-  | { ok: true; authorization_url: string }
+  | { ok: true; authorization_url: string; reference: string }
   | { ok: false; message: string };
 
 function siteBaseUrl(): string {
@@ -179,7 +179,7 @@ export async function startIntakePaystackCheckout(input: unknown): Promise<Payst
     console.warn("startIntakePaystackCheckout access_code patch failed", patchErr.message);
   }
 
-  return { ok: true, authorization_url: init.authorization_url };
+  return { ok: true, authorization_url: init.authorization_url, reference };
 }
 
 export async function startPaystackCheckout(input: unknown): Promise<PaystackCheckoutResult> {
@@ -275,5 +275,5 @@ export async function startPaystackCheckout(input: unknown): Promise<PaystackChe
     console.warn("startPaystackCheckout access_code patch failed", patchErr.message);
   }
 
-  return { ok: true, authorization_url: init.authorization_url };
+  return { ok: true, authorization_url: init.authorization_url, reference };
 }
