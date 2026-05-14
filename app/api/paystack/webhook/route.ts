@@ -5,7 +5,17 @@ export const runtime = "nodejs";
 
 /**
  * Paystack webhook: set URL in Paystack dashboard to POST {NEXT_PUBLIC_SITE_URL}/api/paystack/webhook
+ *
+ * Paystack only sends POST requests here. A GET exists so opening this URL in a browser (or Paystack "ping")
+ * does not show a misleading 404.
  */
+export async function GET() {
+  return new Response(
+    "LandVerify Paystack webhook — Paystack must POST to this URL with a signed body. Browser GET is expected to show this message only.",
+    { status: 200, headers: { "content-type": "text/plain; charset=utf-8" } },
+  );
+}
+
 export async function POST(request: Request) {
   const raw = await request.text();
   const sig = request.headers.get("x-paystack-signature");
