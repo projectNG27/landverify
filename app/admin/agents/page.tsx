@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { adminLogoutAction } from "@/app/actions/admin-auth";
 import { AdminCreateAgentForm } from "@/components/admin/AdminCreateAgentForm";
 import { AdminCreateAgentInviteForm } from "@/components/admin/AdminCreateAgentInviteForm";
+import { AdminPendingInviteRow } from "@/components/admin/AdminPendingInviteRow";
 import { getAdminSessionUser } from "@/lib/admin-auth";
 import { listActiveAgents } from "@/lib/agent-auth";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -32,6 +33,7 @@ export default async function AdminAgentsPage() {
       .from("agent_invites")
       .select("id, invited_email, expires_at, created_at, created_by_admin")
       .is("used_at", null)
+      .is("revoked_at", null)
       .order("created_at", { ascending: false })
       .limit(30);
     pendingInvites = (data ?? []) as PendingInvite[];
@@ -60,31 +62,20 @@ export default async function AdminAgentsPage() {
 
       <section className="mt-6 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Unused invite links</h2>
-        <p className="mt-1 text-xs text-[var(--lv-ink-muted)]">Tokens are not shown again. Create a new invite if a link was lost before use.</p>
+        <p className="mt-1 text-xs text-[var(--lv-ink-muted)]">
+          Use <strong className="text-[var(--lv-ink)]">Copy link again</strong> anytime. <strong className="text-[var(--lv-ink)]">Cancel invite</strong> invalidates a mistaken or leaked link.
+        </p>
         <ul className="mt-3 space-y-2">
-          {pendingInvites.map((inv) => {
-            const expired = new Date(inv.expires_at).getTime() < Date.now();
-            return (
-              <li key={inv.id} className="rounded-lg border border-[var(--lv-border)] px-3 py-2 text-sm">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <span className="font-medium text-[var(--lv-ink)]">{inv.invited_email ?? "Any email"}</span>
-                  {expired ? (
-                    <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-red-800 dark:text-red-200">
-                      Expired
-                    </span>
-                  ) : (
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase text-emerald-800 dark:text-emerald-200">
-                      Valid
-                    </span>
-                  )}
-                </div>
-                <p className="mt-1 text-xs text-[var(--lv-ink-faint)]">
-                  Expires {new Date(inv.expires_at).toLocaleString()} · Created {new Date(inv.created_at).toLocaleDateString()} by{" "}
-                  {inv.created_by_admin}
-                </p>
-              </li>
-            );
-          })}
+          {pendingInvites.map((inv) => (
+            <AdminPendingInviteRow
+              key={inv.id}
+              id={inv.id}
+              invitedEmail={inv.invited_email}
+              expiresAt={inv.expires_at}
+              createdAt={inv.created_at}
+              createdBy={inv.created_by_admin}
+            />
+          ))}
           {pendingInvites.length === 0 ? <li className="text-sm text-[var(--lv-ink-faint)]">No unused invites.</li> : null}
         </ul>
       </section>

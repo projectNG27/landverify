@@ -12,12 +12,24 @@ const inputClass =
 const checkClass =
   "mt-2 h-4 w-4 shrink-0 rounded border-[var(--lv-border)] text-[var(--lv-primary)] focus:ring-[var(--lv-primary)]";
 
-export function AgentRegistrationForm({ token, invitedEmail }: { token: string; invitedEmail: string | null }) {
+export function AgentRegistrationForm({
+  invitedEmail,
+  token,
+  inviteId,
+  inviteSig,
+}: {
+  invitedEmail: string | null;
+  token?: string;
+  inviteId?: string;
+  inviteSig?: string;
+}) {
   const [state, action, pending] = useActionState(registerAgentWithInviteAction, initial);
 
   return (
     <form action={action} className="space-y-5 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-6 shadow-sm">
-      <input type="hidden" name="token" value={token} />
+      {token ? <input type="hidden" name="token" value={token} /> : null}
+      {inviteId ? <input type="hidden" name="invite_id" value={inviteId} /> : null}
+      {inviteSig ? <input type="hidden" name="invite_sig" value={inviteSig} /> : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="sm:col-span-2">

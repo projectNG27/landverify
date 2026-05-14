@@ -22,7 +22,8 @@ export function AdminCreateAgentInviteForm() {
     <form action={action} className="space-y-3 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5 shadow-sm">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Invite link (self-registration)</h2>
       <p className="text-xs leading-relaxed text-[var(--lv-ink-muted)]">
-        Creates a single-use link. Only send it to the person you intend to onboard. The token is not stored in plain form; copy the full URL once after creation.
+        Single-use before registration. Links use a signed format so you can <strong className="text-[var(--lv-ink)]">copy them again</strong> from the list below.
+        Random-token links you sent earlier still work until used or expired.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
         <div>

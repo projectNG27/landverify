@@ -81,6 +81,7 @@ create table if not exists public.agent_invites (
   invited_email text,
   expires_at timestamptz not null,
   used_at timestamptz,
+  revoked_at timestamptz,
   used_by_agent_id uuid references public.agents(id) on delete set null,
   created_by_admin text not null,
   created_at timestamptz not null default now()
@@ -89,6 +90,10 @@ create table if not exists public.agent_invites (
 create index if not exists agent_invites_pending_idx
   on public.agent_invites (created_at desc)
   where used_at is null;
+
+create index if not exists agent_invites_pending_valid_idx
+  on public.agent_invites (created_at desc)
+  where used_at is null and revoked_at is null;
 
 create table if not exists public.request_status_events (
   id bigserial primary key,

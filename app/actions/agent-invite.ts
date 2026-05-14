@@ -4,7 +4,13 @@ import { randomBytes } from "crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { hashAgentPassword } from "@/lib/agent-auth";
-import { hashAgentInviteToken, lookupValidAgentInvite, siteBaseUrl } from "@/lib/agent-invite";
+import {
+  buildSignedAgentInviteUrl,
+  hashAgentInviteToken,
+  lookupValidAgentInvite,
+  lookupValidSignedAgentInvite,
+  type ValidAgentInvite,
+} from "@/lib/agent-invite";
 import { CURRENT_AGENT_ONBOARDING_POLICY } from "@/lib/agent-profile";
 import { getAdminSessionUser } from "@/lib/admin-auth";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
@@ -28,20 +34,88 @@ export async function adminCreateAgentInviteAction(_: AdminAgentInviteState, for
   const token_hash = hashAgentInviteToken(plainToken);
 
   const supabase = getSupabaseAdminClient();
-  const { error } = await supabase.from("agent_invites").insert({
-    token_hash,
-    invited_email,
-    expires_at,
-    created_by_admin: user,
-  });
-  if (error) {
+  const { data: inserted, error } = await supabase
+    .from("agent_invites")
+    .insert({
+      token_hash,
+      invited_email,
+      expires_at,
+      created_by_admin: user,
+    })
+    .select("id, expires_at")
+    .single();
+
+  if (error || !inserted) {
     console.error("adminCreateAgentInviteAction", error);
     return { ok: false, error: "Could not create invite. Try again." };
   }
 
-  const inviteUrl = `${siteBaseUrl()}/agent/register?token=${encodeURIComponent(plainToken)}`;
+  const inviteUrl = buildSignedAgentInviteUrl(inserted.id as string, inserted.expires_at as string);
   revalidatePath("/admin/agents");
-  return { ok: true, success: "Invite created. Copy the link and send it only to the intended agent.", inviteUrl };
+  return {
+    ok: true,
+    success: "Invite created. Copy the link below, or use Copy link in the list anytime before it is used or expires.",
+    inviteUrl,
+  };
+}
+
+export type AdminRevealInviteState = { ok: boolean; url?: string; error?: string };
+
+export async function adminRevealAgentInviteLinkAction(inviteIdRaw: string): Promise<AdminRevealInviteState> {
+  const adminUser = await getAdminSessionUser();
+  if (!adminUser) return { ok: false, error: "Your admin session expired. Sign in again." };
+  if (!isSupabaseConfigured()) return { ok: false, error: "Supabase is not configured on this server." };
+
+  const inviteId = inviteIdRaw.trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(inviteId)) {
+    return { ok: false, error: "Invalid invite." };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("agent_invites")
+    .select("id, expires_at, used_at, revoked_at")
+    .eq("id", inviteId)
+    .maybeSingle();
+
+  if (error || !data) return { ok: false, error: "Invite not found." };
+  if (data.used_at) return { ok: false, error: "This invite was already used." };
+  if (data.revoked_at) return { ok: false, error: "This invite was cancelled." };
+  if (new Date(data.expires_at as string).getTime() < Date.now()) {
+    return { ok: false, error: "This invite has expired. Create a new one." };
+  }
+
+  return { ok: true, url: buildSignedAgentInviteUrl(data.id as string, data.expires_at as string) };
+}
+
+export type AdminRevokeInviteState = { ok: boolean; error?: string };
+
+export async function adminRevokeAgentInviteAction(inviteIdRaw: string): Promise<AdminRevokeInviteState> {
+  const adminUser = await getAdminSessionUser();
+  if (!adminUser) return { ok: false, error: "Your admin session expired. Sign in again." };
+  if (!isSupabaseConfigured()) return { ok: false, error: "Supabase is not configured on this server." };
+
+  const inviteId = inviteIdRaw.trim();
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(inviteId)) {
+    return { ok: false, error: "Invalid invite." };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from("agent_invites")
+    .update({ revoked_at: new Date().toISOString() })
+    .eq("id", inviteId)
+    .is("used_at", null)
+    .is("revoked_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (error || !data) {
+    return { ok: false, error: "Could not cancel invite (it may already be used or cancelled)." };
+  }
+
+  revalidatePath("/admin/agents");
+  return { ok: true };
 }
 
 export type AgentRegisterState = { ok: boolean; error?: string };
@@ -53,8 +127,19 @@ function digitsOnly(s: string): string {
 export async function registerAgentWithInviteAction(_: AgentRegisterState, formData: FormData): Promise<AgentRegisterState> {
   if (!isSupabaseConfigured()) return { ok: false, error: "Server is not configured." };
 
+  const inviteIdParam = String(formData.get("invite_id") ?? "").trim();
+  const inviteSig = String(formData.get("invite_sig") ?? "").trim();
   const token = String(formData.get("token") ?? "").trim();
-  const looked = await lookupValidAgentInvite(token);
+
+  let looked: { ok: true; invite: ValidAgentInvite } | { ok: false; message: string };
+  if (inviteIdParam && inviteSig) {
+    looked = await lookupValidSignedAgentInvite(inviteIdParam, inviteSig);
+  } else if (token) {
+    looked = await lookupValidAgentInvite(token);
+  } else {
+    return { ok: false, error: "Missing invite. Open the full registration link your manager sent you." };
+  }
+
   if (!looked.ok) return { ok: false, error: looked.message };
 
   const fullName = String(formData.get("full_name") ?? "").trim();
@@ -90,6 +175,7 @@ export async function registerAgentWithInviteAction(_: AgentRegisterState, formD
     .update({ used_at: new Date().toISOString() })
     .eq("id", inviteId)
     .is("used_at", null)
+    .is("revoked_at", null)
     .select("id")
     .maybeSingle();
 

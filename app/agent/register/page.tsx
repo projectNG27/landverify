@@ -3,24 +3,31 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { AgentRegistrationForm } from "@/components/agent/AgentRegistrationForm";
 import { getAgentSessionUser } from "@/lib/admin-auth";
-import { lookupValidAgentInvite } from "@/lib/agent-invite";
+import { lookupValidAgentInvite, lookupValidSignedAgentInvite } from "@/lib/agent-invite";
 
 export const metadata: Metadata = {
   title: "Agent registration",
   robots: { index: false, follow: false },
 };
 
-type Props = { searchParams: Promise<{ token?: string | string[] }> };
+type Props = { searchParams: Promise<{ token?: string | string[]; i?: string | string[]; s?: string | string[] }> };
 
 export default async function AgentRegisterPage({ searchParams }: Props) {
   const user = await getAgentSessionUser();
   if (user) redirect("/agent");
 
   const sp = await searchParams;
-  const raw = sp.token;
-  const token = Array.isArray(raw) ? raw[0] : raw;
+  const rawToken = sp.token;
+  const token = (Array.isArray(rawToken) ? rawToken[0] : rawToken)?.trim();
+  const rawI = sp.i;
+  const rawS = sp.s;
+  const inviteId = (Array.isArray(rawI) ? rawI[0] : rawI)?.trim();
+  const inviteSig = (Array.isArray(rawS) ? rawS[0] : rawS)?.trim();
 
-  if (!token?.trim()) {
+  const hasSigned = Boolean(inviteId && inviteSig);
+  const hasLegacyToken = Boolean(token);
+
+  if (!hasSigned && !hasLegacyToken) {
     return (
       <div className="mx-auto max-w-md px-4 py-14 sm:px-6">
         <h1 className="text-2xl font-bold text-[var(--lv-ink)]">Agent registration</h1>
@@ -37,7 +44,13 @@ export default async function AgentRegisterPage({ searchParams }: Props) {
     );
   }
 
-  const result = await lookupValidAgentInvite(token);
+  let result: Awaited<ReturnType<typeof lookupValidSignedAgentInvite>>;
+  if (hasSigned) {
+    result = await lookupValidSignedAgentInvite(inviteId!, inviteSig!);
+  } else {
+    result = await lookupValidAgentInvite(token!);
+  }
+
   if (!result.ok) {
     return (
       <div className="mx-auto max-w-md px-4 py-14 sm:px-6">
@@ -59,7 +72,12 @@ export default async function AgentRegisterPage({ searchParams }: Props) {
       <h1 className="text-2xl font-bold text-[var(--lv-ink)]">Complete your agent account</h1>
       <p className="mt-2 text-sm text-[var(--lv-ink-muted)]">Use the details you want for sign-in and how we can reach you.</p>
       <div className="mt-6">
-        <AgentRegistrationForm token={token.trim()} invitedEmail={result.invite.invitedEmail} />
+        <AgentRegistrationForm
+          invitedEmail={result.invite.invitedEmail}
+          token={token && !(inviteId && inviteSig) ? token : undefined}
+          inviteId={inviteId && inviteSig ? inviteId : undefined}
+          inviteSig={inviteId && inviteSig ? inviteSig : undefined}
+        />
       </div>
     </div>
   );
