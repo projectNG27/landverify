@@ -14,6 +14,10 @@ const inputClass =
 const checkClass =
   "mt-2 h-4 w-4 shrink-0 rounded border-[var(--lv-border)] text-[var(--lv-primary)] focus:ring-[var(--lv-primary)]";
 
+function digitsOnly(s: string): string {
+  return s.replace(/\D/g, "");
+}
+
 export function AgentRegistrationForm({
   invitedEmail,
   token,
@@ -26,6 +30,16 @@ export function AgentRegistrationForm({
   inviteSig?: string;
 }) {
   const [state, action, pending] = useActionState(registerAgentWithInviteAction, initial);
+
+  const [fullName, setFullName] = useState("");
+  const [email, setEmail] = useState(() => invitedEmail ?? "");
+  const [phone, setPhone] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
+  const [username, setUsername] = useState("");
+  const [coverageStates, setCoverageStates] = useState<string[]>([]);
+  const [ackAccuracy, setAckAccuracy] = useState(false);
+  const [ackConsequences, setAckConsequences] = useState(false);
+
   const [password, setPassword] = useState("");
   const [password2, setPassword2] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -39,10 +53,18 @@ export function AgentRegistrationForm({
   const passwordInputType = showPassword ? "text" : "password";
   const submitBlocked =
     pending ||
+    fullName.trim().length < 2 ||
+    !email.includes("@") ||
+    username.trim().length < 3 ||
+    digitsOnly(phone).length < 10 ||
+    digitsOnly(whatsapp).length < 10 ||
     password.length < 8 ||
     password2.length < 8 ||
     password !== password2 ||
-    hint.level === "weak";
+    hint.level === "weak" ||
+    coverageStates.length < 1 ||
+    !ackAccuracy ||
+    !ackConsequences;
 
   return (
     <form action={action} className="space-y-5 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-6 shadow-sm">
@@ -55,7 +77,16 @@ export function AgentRegistrationForm({
           <label htmlFor="reg_full_name" className="text-xs font-medium text-[var(--lv-ink)]">
             Full name
           </label>
-          <input id="reg_full_name" name="full_name" className={inputClass} required autoComplete="name" />
+          <input
+            id="reg_full_name"
+            name="full_name"
+            className={inputClass}
+            required
+            minLength={2}
+            autoComplete="name"
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+          />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="reg_email" className="text-xs font-medium text-[var(--lv-ink)]">
@@ -68,7 +99,8 @@ export function AgentRegistrationForm({
             className={inputClass}
             required
             autoComplete="email"
-            defaultValue={invitedEmail ?? undefined}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             readOnly={Boolean(invitedEmail)}
             aria-readonly={Boolean(invitedEmail)}
           />
@@ -80,19 +112,48 @@ export function AgentRegistrationForm({
           <label htmlFor="reg_phone" className="text-xs font-medium text-[var(--lv-ink)]">
             Phone
           </label>
-          <input id="reg_phone" name="phone" type="tel" className={inputClass} required autoComplete="tel" placeholder="+234…" />
+          <input
+            id="reg_phone"
+            name="phone"
+            type="tel"
+            className={inputClass}
+            required
+            autoComplete="tel"
+            placeholder="+234…"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+          />
         </div>
         <div>
           <label htmlFor="reg_whatsapp" className="text-xs font-medium text-[var(--lv-ink)]">
             WhatsApp number
           </label>
-          <input id="reg_whatsapp" name="whatsapp_number" type="tel" className={inputClass} required autoComplete="tel" placeholder="Same or different as phone" />
+          <input
+            id="reg_whatsapp"
+            name="whatsapp_number"
+            type="tel"
+            className={inputClass}
+            required
+            autoComplete="tel"
+            placeholder="Same or different as phone"
+            value={whatsapp}
+            onChange={(e) => setWhatsapp(e.target.value)}
+          />
         </div>
         <div>
           <label htmlFor="reg_username" className="text-xs font-medium text-[var(--lv-ink)]">
             Username
           </label>
-          <input id="reg_username" name="username" className={inputClass} required autoComplete="username" minLength={3} />
+          <input
+            id="reg_username"
+            name="username"
+            className={inputClass}
+            required
+            autoComplete="username"
+            minLength={3}
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+          />
         </div>
         <div className="sm:col-span-2">
           <div className="flex flex-wrap items-end justify-between gap-2">
@@ -179,6 +240,8 @@ export function AgentRegistrationForm({
       <AgentCoverageStateCheckboxes
         legend="States you can represent"
         description="Select every state where you can reliably perform verification work. Managers use this to match you to requests."
+        selectedStates={coverageStates}
+        onSelectedStatesChange={setCoverageStates}
       />
 
       <div>
@@ -187,14 +250,26 @@ export function AgentRegistrationForm({
           LandVerify relies on accurate verification work. Confirm the statements below to create your account.
         </p>
         <div className="mt-3 space-y-3 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/25 p-4">
+          {ackAccuracy ? <input type="hidden" name="ack_accuracy" value="on" /> : null}
           <label className="flex cursor-pointer gap-3">
-            <input type="checkbox" name="ack_accuracy" className={checkClass} required />
+            <input
+              type="checkbox"
+              checked={ackAccuracy}
+              onChange={(e) => setAckAccuracy(e.target.checked)}
+              className={checkClass}
+            />
             <span className="text-sm leading-relaxed text-[var(--lv-ink)]">
               I will provide <strong>verified, accurate</strong> information in my LandVerify work.
             </span>
           </label>
+          {ackConsequences ? <input type="hidden" name="ack_consequences" value="on" /> : null}
           <label className="flex cursor-pointer gap-3">
-            <input type="checkbox" name="ack_consequences" className={checkClass} required />
+            <input
+              type="checkbox"
+              checked={ackConsequences}
+              onChange={(e) => setAckConsequences(e.target.checked)}
+              className={checkClass}
+            />
             <span className="text-sm leading-relaxed text-[var(--lv-ink)]">
               I understand that <strong>false or manipulated</strong> information may result in{" "}
               <strong>being banned</strong> from the agent platform.

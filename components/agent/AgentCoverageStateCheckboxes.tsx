@@ -9,29 +9,45 @@ const checkClass =
 type Props = {
   legend: string;
   description?: string;
+  /** When both are set, selection is controlled by the parent (survives server action errors). */
+  selectedStates?: string[];
+  onSelectedStatesChange?: (states: string[]) => void;
 };
+
+function sortStatesUnique(states: string[]): string[] {
+  return [...new Set(states)].filter((s) => (REQUEST_INTAKE_STATE_VALUES as readonly string[]).includes(s)).sort();
+}
 
 /**
  * Multi-select for agent coverage. Same canonical list as public intake (`REQUEST_INTAKE_STATE_VALUES`).
  * Selection is stored in React state + hidden inputs so search/filter never drops checked values from the POST body.
  */
-export function AgentCoverageStateCheckboxes({ legend, description }: Props) {
+export function AgentCoverageStateCheckboxes({ legend, description, selectedStates, onSelectedStatesChange }: Props) {
   const filterId = useId();
   const [query, setQuery] = useState("");
-  const [selected, setSelected] = useState<Set<string>>(() => new Set());
+  const [internalSelected, setInternalSelected] = useState<Set<string>>(() => new Set());
+
+  const isControlled = typeof onSelectedStatesChange === "function" && selectedStates !== undefined;
+  const selected = useMemo(() => {
+    if (isControlled) return new Set(selectedStates);
+    return internalSelected;
+  }, [isControlled, selectedStates, internalSelected]);
+
+  const setSelected = (next: Set<string>) => {
+    const arr = sortStatesUnique([...next]);
+    if (isControlled) onSelectedStatesChange(arr);
+    else setInternalSelected(next);
+  };
+
+  const toggle = (state: string) => {
+    const next = new Set(selected);
+    if (next.has(state)) next.delete(state);
+    else next.add(state);
+    setSelected(next);
+  };
 
   const allStates = useMemo(() => [...REQUEST_INTAKE_STATE_VALUES] as string[], []);
 
-  const toggle = (state: string) => {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(state)) next.delete(state);
-      else next.add(state);
-      return next;
-    });
-  };
-
-  /** Matches search, plus any selected state so it stays visible and togglable. */
   const visibleStates = useMemo(() => {
     const q = query.trim().toLowerCase();
     const matches = q ? allStates.filter((s) => s.toLowerCase().includes(q)) : [...allStates];
