@@ -9,9 +9,11 @@ import { AdminRequestMessageForm } from "@/components/admin/AdminRequestMessageF
 import { AdminRequesterReplyForm } from "@/components/admin/AdminRequesterReplyForm";
 import { AdminUpdateRequestStatusForm } from "@/components/admin/AdminUpdateRequestStatusForm";
 import { getAdminSessionUser } from "@/lib/admin-auth";
+import { getSupabaseAdminClient } from "@/lib/supabase/admin";
 import { RequestAttachmentDownloads } from "@/components/shared/RequestAttachmentDownloads";
 import { normalizeDocumentNames } from "@/lib/document-names";
-import { parseStoredAttachments } from "@/lib/request-document-storage";
+import { parseStoredAttachments, signAttachmentDownloadUrls } from "@/lib/request-document-storage";
+import type { StoredAttachment } from "@/lib/request-document-storage";
 import { formatRemaining } from "@/lib/db/sla";
 import { formatNgnFromKobo } from "@/lib/pricing";
 import { paymentChannelLabel } from "@/lib/payment-display";
@@ -53,6 +55,23 @@ export default async function AdminRequestDetailPage({ params }: Props) {
   const agents = await getActiveAgentOptions();
 
   const r = detail.request as RequestDetailRow;
+  const requestId = String((detail.request as { id: string }).id);
+  const supabase = getSupabaseAdminClient();
+  const { data: agentRespRows } = await supabase
+    .from("agent_response_attachments")
+    .select("bucket, path, filename, content_type, size_bytes")
+    .eq("request_id", requestId)
+    .order("created_at", { ascending: false });
+
+  const agentRespStored: StoredAttachment[] = (agentRespRows ?? []).map((row) => ({
+    bucket: String((row as { bucket: string }).bucket),
+    path: String((row as { path: string }).path),
+    filename: String((row as { filename: string }).filename),
+    content_type: (row as { content_type: string | null }).content_type ?? null,
+    size: Number((row as { size_bytes: number }).size_bytes) || 0,
+  }));
+  const agentResponseLinks = await signAttachmentDownloadUrls(supabase, agentRespStored);
+
   const remain = formatRemaining(r.sla_due_at);
   const attachmentNames = normalizeDocumentNames(r.document_names);
   const storedFiles = parseStoredAttachments(r.document_attachments);
@@ -196,6 +215,37 @@ export default async function AdminRequestDetailPage({ params }: Props) {
               </p>
             ) : null}
           </div>
+
+          {agentResponseLinks.length > 0 ? (
+            <div className="mt-6 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/20 p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h3 className="text-sm font-semibold text-[var(--lv-ink)]">Agent uploads</h3>
+                <span className="rounded-full bg-[var(--lv-surface)] px-2.5 py-1 text-xs font-semibold text-[var(--lv-ink-muted)] ring-1 ring-[var(--lv-border)]">
+                  {agentResponseLinks.length} file{agentResponseLinks.length === 1 ? "" : "s"}
+                </span>
+              </div>
+              <ul className="mt-3 grid gap-2 sm:grid-cols-2">
+                {agentResponseLinks.map((link) => (
+                  <li
+                    key={`${link.filename}-${link.url.slice(-24)}`}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2.5 text-sm"
+                  >
+                    <a
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 flex-1 font-medium text-[var(--lv-primary)] underline-offset-2 hover:underline"
+                      download={link.filename}
+                    >
+                      {link.filename}
+                    </a>
+                    <span className="shrink-0 text-xs text-[var(--lv-ink-faint)]">{Math.round(link.size / 1024)} KB</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="mt-2 text-xs text-[var(--lv-ink-faint)]">Signed links expire after about an hour.</p>
+            </div>
+          ) : null}
         </section>
 
         <aside className="space-y-4">

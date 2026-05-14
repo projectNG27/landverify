@@ -67,6 +67,9 @@ create table if not exists public.agents (
   password_hash text,
   full_name text not null,
   is_active boolean not null default true,
+  agent_onboarding_completed_at timestamptz,
+  agent_onboarding_policy_version text,
+  last_seen_at timestamptz,
   created_at timestamptz not null default now()
 );
 
@@ -151,6 +154,21 @@ create table if not exists public.agent_findings (
 
 create index if not exists agent_findings_request_id_idx on public.agent_findings(request_id);
 
+create table if not exists public.agent_response_attachments (
+  id bigserial primary key,
+  request_id uuid not null references public.requests(id) on delete cascade,
+  agent_id uuid not null references public.agents(id) on delete cascade,
+  bucket text not null,
+  path text not null,
+  filename text not null,
+  content_type text,
+  size_bytes bigint not null default 0,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists agent_response_attachments_request_id_idx
+  on public.agent_response_attachments (request_id, created_at desc);
+
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
@@ -180,4 +198,5 @@ alter table public.payments disable row level security;
 alter table public.report_outputs disable row level security;
 alter table public.request_messages disable row level security;
 alter table public.agent_findings disable row level security;
+alter table public.agent_response_attachments disable row level security;
 

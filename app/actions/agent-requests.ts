@@ -1,8 +1,11 @@
 "use server";
 
+import { randomUUID } from "crypto";
 import { revalidatePath } from "next/cache";
 import { getAgentSessionUser } from "@/lib/admin-auth";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { requestDocumentsBucket } from "@/lib/request-document-storage";
+import { MAX_FILE_BYTES, resolveIntakeFileMime } from "@/lib/validations/request-intake";
 
 export type AgentActionState = {
   ok: boolean;
@@ -139,5 +142,85 @@ export async function agentSendMessageAction(_: AgentActionState, formData: Form
   revalidatePath(`/agent/tasks/${request.request_code}`);
   revalidatePath(`/admin/requests/${request.request_code}`);
   return { ok: true, success: "Message sent to manager." };
+}
+
+const MAX_AGENT_RESPONSE_FILES_PER_SUBMIT = 5;
+
+function safeAgentFilename(name: string): string {
+  const base = name.replace(/[/\\]/g, "_").replace(/[^a-zA-Z0-9._\u00C0-\u024F\u1E00-\u1EFF-]/g, "_");
+  return base.slice(0, 180) || "file";
+}
+
+export type AgentUploadState = { ok: boolean; error?: string; success?: string };
+
+export async function agentUploadResponseAttachmentsAction(_: AgentUploadState, formData: FormData): Promise<AgentUploadState> {
+  if (!isSupabaseConfigured()) return { ok: false, error: "Supabase is not configured." };
+  const username = await getAgentSessionUser();
+  if (!username) return { ok: false, error: "Session expired. Sign in again." };
+
+  const requestCode = String(formData.get("request_code") ?? "").trim().toUpperCase();
+  if (!requestCode) return { ok: false, error: "Missing request code." };
+
+  const rawFiles = formData.getAll("files");
+  const files = rawFiles.filter((x): x is File => typeof File !== "undefined" && x instanceof File && x.size > 0);
+  if (files.length === 0) return { ok: false, error: "Choose at least one file." };
+  if (files.length > MAX_AGENT_RESPONSE_FILES_PER_SUBMIT) {
+    return { ok: false, error: `You can upload up to ${MAX_AGENT_RESPONSE_FILES_PER_SUBMIT} files at once.` };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const agent = await getAgentByUsername(username);
+  if (!agent) return { ok: false, error: "Agent not found." };
+
+  const { data: request } = await supabase
+    .from("requests")
+    .select("id, request_code, assigned_agent_id")
+    .eq("request_code", requestCode)
+    .maybeSingle();
+  if (!request || request.assigned_agent_id !== agent.id) return { ok: false, error: "Request not assigned to you." };
+
+  const bucket = requestDocumentsBucket();
+
+  for (const file of files) {
+    if (file.size > MAX_FILE_BYTES) {
+      return { ok: false, error: `“${file.name}” exceeds the ${MAX_FILE_BYTES / (1024 * 1024)} MB limit.` };
+    }
+    if (!resolveIntakeFileMime(file)) {
+      return { ok: false, error: `“${file.name}” must be PDF, JPEG, PNG, or WebP.` };
+    }
+  }
+
+  for (const file of files) {
+    const suffix = randomUUID().slice(0, 8);
+    const path = `${request.id}/agent-response/${agent.id}/${suffix}_${safeAgentFilename(file.name)}`;
+    const buf = await file.arrayBuffer();
+    const { error: upErr } = await supabase.storage.from(bucket).upload(path, buf, {
+      contentType: file.type || "application/octet-stream",
+      upsert: false,
+    });
+    if (upErr) {
+      console.error("agentUploadResponseAttachmentsAction storage", upErr);
+      return { ok: false, error: upErr.message || "Upload failed." };
+    }
+
+    const { error: insErr } = await supabase.from("agent_response_attachments").insert({
+      request_id: request.id,
+      agent_id: agent.id,
+      bucket,
+      path,
+      filename: file.name,
+      content_type: file.type || null,
+      size_bytes: file.size,
+    });
+    if (insErr) {
+      console.error("agentUploadResponseAttachmentsAction insert", insErr);
+      await supabase.storage.from(bucket).remove([path]);
+      return { ok: false, error: "Could not save file record. Try again." };
+    }
+  }
+
+  revalidatePath(`/agent/tasks/${request.request_code}`);
+  revalidatePath(`/admin/requests/${request.request_code}`);
+  return { ok: true, success: `${files.length} file(s) uploaded.` };
 }
 
