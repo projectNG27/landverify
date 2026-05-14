@@ -1,9 +1,11 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
+import Link from "next/link";
 import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { lookupTrackRequest, type TrackRequestActionResult } from "@/app/actions/track-request";
+import { PaymentReceiptPanel } from "@/components/public/PaymentReceiptPanel";
 import { TrackCaseMessagesPanel } from "@/components/public/TrackCaseMessagesPanel";
 import {
   trackRequestSchema,
@@ -201,6 +203,23 @@ export function TrackRequestForm() {
             </p>
           )}
           <TimelinePreview activeIndex={activeIndex} />
+          {liveOk && result.payment_status ? (
+            <p className="mt-4 text-sm text-[var(--lv-ink-muted)]">
+              Payment:{" "}
+              <span className="font-semibold capitalize text-[var(--lv-ink)]">{result.payment_status}</span>
+              {String(result.payment_status).toLowerCase() !== "paid" ? (
+                <>
+                  {" · "}
+                  <Link
+                    href={`/pay?code=${encodeURIComponent(result.request_id)}`}
+                    className="font-semibold text-[var(--lv-primary)] underline-offset-2 hover:underline"
+                  >
+                    Pay online with Paystack
+                  </Link>
+                </>
+              ) : null}
+            </p>
+          ) : null}
           {history ? (
             <div className="mt-8 border-t border-[var(--lv-border)] pt-6">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">Activity log</p>
@@ -226,6 +245,14 @@ export function TrackRequestForm() {
               email={lastTracked.current.email}
               messages={result.case_messages ?? []}
               onAfterSend={refreshLiveTracking}
+            />
+          ) : null}
+          {liveOk && lastTracked.current && result.ok && result.mode === "live" && result.receipt && result.full_name ? (
+            <PaymentReceiptPanel
+              requestId={lastTracked.current.request_id}
+              email={lastTracked.current.email}
+              customerName={result.full_name}
+              receipt={result.receipt}
             />
           ) : null}
         </div>

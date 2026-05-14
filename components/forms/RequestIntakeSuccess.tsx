@@ -97,7 +97,7 @@ export function RequestIntakeSuccess({ mode, requestId, email, onSubmitAnother }
             <p className="text-sm text-[var(--lv-ink-muted)]">
               <span className="font-medium text-[var(--lv-ink)]">Confirmation email:</span> we&apos;ll use{" "}
               <span className="break-all font-medium text-[var(--lv-ink)]">{email}</span> for updates about this case.
-              When payment and receipts are enabled, we&apos;ll reference this email and your case ID.
+              Your tier payment is already on file — open Track request for receipts when they are available.
             </p>
           ) : null}
 
@@ -105,8 +105,8 @@ export function RequestIntakeSuccess({ mode, requestId, email, onSubmitAnother }
             <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-primary)]">What happens next</p>
             <ol className="mt-3 list-inside list-decimal space-y-2 text-sm text-[var(--lv-ink-muted)]">
               <li>
-                <strong className="text-[var(--lv-ink)]">Payment:</strong> complete payment for your chosen tier when you
-                receive instructions (email/WhatsApp). Keep your receipt — quote your case ID if asked.
+                <strong className="text-[var(--lv-ink)]">Payment:</strong> your tier was paid via Paystack before this
+                submission. Use <strong className="text-[var(--lv-ink)]">Track request</strong> for receipts and updates.
               </li>
               <li>
                 <strong className="text-[var(--lv-ink)]">Tracking:</strong> follow progress anytime with your case ID and

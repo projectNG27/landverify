@@ -31,14 +31,22 @@ export default async function AdminHomePage() {
             Signed in as <span className="font-medium text-[var(--lv-ink)]">{user}</span>.
           </p>
         </div>
-        <form action={adminLogoutAction}>
-          <button
-            type="submit"
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/account"
             className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)]"
           >
-            Sign out
-          </button>
-        </form>
+            Account
+          </Link>
+          <form action={adminLogoutAction}>
+            <button
+              type="submit"
+              className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)]"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </div>
 
       {!configured ? (

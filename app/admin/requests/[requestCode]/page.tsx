@@ -13,6 +13,8 @@ import { RequestAttachmentDownloads } from "@/components/shared/RequestAttachmen
 import { normalizeDocumentNames } from "@/lib/document-names";
 import { parseStoredAttachments } from "@/lib/request-document-storage";
 import { formatRemaining } from "@/lib/db/sla";
+import { formatNgnFromKobo } from "@/lib/pricing";
+import { paymentChannelLabel } from "@/lib/payment-display";
 import { getActiveAgentOptions, getRequestDetailByCode } from "@/lib/db/manager-requests";
 
 export const metadata: Metadata = {
@@ -70,14 +72,22 @@ export default async function AdminRequestDetailPage({ params }: Props) {
             Tier: <span className="capitalize">{r.product_id}</span> · Status: {String(r.status).replace(/_/g, " ")}
           </p>
         </div>
-        <form action={adminLogoutAction}>
-          <button
-            type="submit"
+        <div className="flex flex-wrap items-center gap-2">
+          <Link
+            href="/admin/account"
             className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)]"
           >
-            Sign out
-          </button>
-        </form>
+            Account
+          </Link>
+          <form action={adminLogoutAction}>
+            <button
+              type="submit"
+              className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)]"
+            >
+              Sign out
+            </button>
+          </form>
+        </div>
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
@@ -201,6 +211,46 @@ export default async function AdminRequestDetailPage({ params }: Props) {
       </div>
 
       <div className="mt-6 grid gap-6">
+        <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Paystack payments</h2>
+          <p className="mt-2 text-xs text-[var(--lv-ink-muted)]">
+            Amounts match the tier on the request. Card rows show whether Paystack reported a domestic (NG) or
+            international issuer.
+          </p>
+          {detail.payments.length === 0 ? (
+            <p className="mt-3 text-sm text-[var(--lv-ink-faint)]">No payment attempts recorded yet.</p>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="min-w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-[var(--lv-border)] text-xs uppercase text-[var(--lv-ink-faint)]">
+                    <th className="py-2 pr-4 font-semibold">When</th>
+                    <th className="py-2 pr-4 font-semibold">Status</th>
+                    <th className="py-2 pr-4 font-semibold">Amount</th>
+                    <th className="py-2 pr-4 font-semibold">Channel / card</th>
+                    <th className="py-2 font-semibold">Reference</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.payments.map((p) => (
+                    <tr key={p.id} className="border-b border-[var(--lv-border)]/80 text-[var(--lv-ink-muted)]">
+                      <td className="py-2 pr-4 whitespace-nowrap text-[var(--lv-ink)]">
+                        {new Date(p.created_at).toLocaleString()}
+                      </td>
+                      <td className="py-2 pr-4 capitalize">{p.status}</td>
+                      <td className="py-2 pr-4 font-medium text-[var(--lv-ink)]">
+                        {p.amount_kobo != null ? formatNgnFromKobo(Number(p.amount_kobo)) : "—"}
+                      </td>
+                      <td className="py-2 pr-4">{paymentChannelLabel(p.card_origin, p.channel)}</td>
+                      <td className="py-2 font-mono text-xs break-all text-[var(--lv-ink)]">{p.reference ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
+
         <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Agent findings</h2>
           {detail.findings.length === 0 ? (

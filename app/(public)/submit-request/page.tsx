@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { Suspense } from "react";
 import { RequestIntakeForm } from "@/components/forms/RequestIntakeForm";
+import { isPaystackConfigured, isPaystackTestMode } from "@/lib/paystack";
 import { isSupabaseConfigured } from "@/lib/supabase/admin";
 
 export const metadata: Metadata = {
@@ -14,6 +16,7 @@ export const dynamic = "force-dynamic";
 
 export default function SubmitRequestPage() {
   const persistenceConfigured = isSupabaseConfigured();
+  const paymentsConfigured = persistenceConfigured ? isPaystackConfigured() : false;
   // Generated on the server for stable hydration in the client form.
   const captchaA = Math.floor(Math.random() * 8) + 2;
   const captchaB = Math.floor(Math.random() * 8) + 2;
@@ -26,8 +29,11 @@ export default function SubmitRequestPage() {
         Land verification request
       </h1>
       <p className="mt-4 text-[var(--lv-ink-muted)]">
-        Complete this form with accurate details. We validate everything on the server; when the database is connected,
-        your request is saved and you receive a tracking ID by email.
+        Complete this form with accurate details. When the database is connected, a{" "}
+        <strong className="text-[var(--lv-ink)]">Payment service (Paystack)</strong> section appears below your product
+        choice: you acknowledge the charge, then continue to Paystack to enter card or bank details (not on this
+        page). After Paystack confirms, finish the form and submit. When the database is not connected, you can still
+        practice the form without saving.
       </p>
 
       {persistenceConfigured ? null : (
@@ -40,12 +46,18 @@ export default function SubmitRequestPage() {
       )}
 
       <div className="mt-10">
-        <RequestIntakeForm
-          captchaA={captchaA}
-          captchaB={captchaB}
-          formStartedAt={formStartedAt}
-          persistenceConfigured={persistenceConfigured}
-        />
+        <Suspense
+          fallback={<div className="text-sm text-[var(--lv-ink-muted)]">Loading form…</div>}
+        >
+          <RequestIntakeForm
+            captchaA={captchaA}
+            captchaB={captchaB}
+            formStartedAt={formStartedAt}
+            persistenceConfigured={persistenceConfigured}
+            paymentsConfigured={paymentsConfigured}
+            paystackTestMode={isPaystackTestMode()}
+          />
+        </Suspense>
       </div>
 
       <p className="mt-12 text-center text-sm">

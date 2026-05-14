@@ -1,6 +1,8 @@
 "use server";
 
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
+import { validateIntakePaymentForSubmit } from "@/lib/intake-payment";
+import { isPaystackConfigured } from "@/lib/paystack";
 import { computeSlaDueAt } from "@/lib/db/sla";
 import {
   deleteStoredAttachments,
@@ -24,6 +26,9 @@ export type RequestIntakeActionResult =
     };
 
 function friendlyDbMessage(raw: string): string | undefined {
+  if (raw.includes("<!DOCTYPE html") || (raw.includes("404") && raw.toLowerCase().includes("could not be found"))) {
+    return "Database URL is wrong on the server: set NEXT_PUBLIC_SUPABASE_URL in Vercel to your Supabase project URL (Dashboard → Settings → API → Project URL, looks like https://xxxxx.supabase.co). It must not be your LandVerify site URL.";
+  }
   const m = raw.toLowerCase();
   if (
     m.includes("permission denied") ||
@@ -128,6 +133,8 @@ export async function submitRequestIntake(formData: FormData): Promise<RequestIn
     return { ok: false, message: fileErr };
   }
 
+  const paystackReferenceRaw = String(formData.get("paystack_reference") ?? "").trim();
+
   const payload = intakePayloadFromFormData(formData, files);
   const parsed = requestIntakeSchema.safeParse(payload);
 
@@ -142,6 +149,33 @@ export async function submitRequestIntake(formData: FormData): Promise<RequestIn
 
   if (!isSupabaseConfigured()) {
     return { ok: true, mode: "preview" };
+  }
+
+  if (!isPaystackConfigured()) {
+    return {
+      ok: false,
+      message:
+        "This deployment cannot save requests until Paystack is configured (set PAYSTACK_SECRET_KEY). Payment is required before we accept a submission.",
+    };
+  }
+
+  if (!paystackReferenceRaw) {
+    return {
+      ok: false,
+      message:
+        "Complete Paystack payment for your selected tier before submitting. Use Pay with Paystack on this page, then return here to send your details.",
+    };
+  }
+
+  const supabase = getSupabaseAdminClient();
+  const paymentGate = await validateIntakePaymentForSubmit(
+    supabase,
+    paystackReferenceRaw,
+    parsed.data.email,
+    parsed.data.product_id,
+  );
+  if (!paymentGate.ok) {
+    return { ok: false, message: paymentGate.message };
   }
 
   const coordinates = parsed.data.coordinates.trim();
@@ -159,7 +193,6 @@ export async function submitRequestIntake(formData: FormData): Promise<RequestIn
   const codeSuffix = Math.random().toString(36).slice(2, 10).toUpperCase();
   const requestCode = `LV-${year}-${codeSuffix}`;
 
-  const supabase = getSupabaseAdminClient();
   const slaDueAt = computeSlaDueAt(new Date(), parsed.data.product_id as "basic" | "standard" | "premium");
 
   const { data: requestRow, error: insertError } = await supabase
@@ -182,7 +215,7 @@ export async function submitRequestIntake(formData: FormData): Promise<RequestIn
       additional_notes: parsed.data.additional_notes || null,
       document_names: files.length === 0 ? (parsed.data.document_names ?? []) : [],
       document_attachments: [],
-      payment_status: "unpaid",
+      payment_status: "paid",
       sla_due_at: slaDueAt,
       status: "received",
     })
@@ -241,11 +274,30 @@ export async function submitRequestIntake(formData: FormData): Promise<RequestIn
     request_id: requestRow.id,
     status: "received",
     actor: "system",
-    note: "Request submitted via public intake form.",
+    note: "Request submitted via public intake form. Tier prepaid via Paystack before submission.",
   });
 
   if (statusInsertError) {
     console.warn("request_status_events insert failed", statusInsertError.message);
+  }
+
+  const { data: linked, error: linkErr } = await supabase
+    .from("payments")
+    .update({ request_id: requestRow.id })
+    .eq("id", paymentGate.paymentDbId)
+    .is("request_id", null)
+    .select("id")
+    .maybeSingle();
+
+  if (linkErr || !linked) {
+    console.error("submitRequestIntake link payment failed", linkErr);
+    if (attachments.length > 0) await deleteStoredAttachments(supabase, attachments);
+    await supabase.from("requests").delete().eq("id", requestRow.id);
+    return {
+      ok: false,
+      message:
+        "We could not attach your Paystack payment to this case. Your Paystack charge is unchanged — submit again with the same payment reference, or contact support with your case details.",
+    };
   }
 
   return { ok: true, request_id: requestRow.request_code, mode: "live" };

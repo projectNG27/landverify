@@ -4,5 +4,6 @@ export const PUBLIC_NAV = [
   { href: "/blog", label: "Insights" },
   { href: "/pricing", label: "Pricing" },
   { href: "/submit-request", label: "Submit request" },
+  { href: "/pay", label: "Pay" },
   { href: "/track-request", label: "Track request" },
 ] as const;

@@ -2,12 +2,14 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { type FieldErrors, useForm } from "react-hook-form";
+import { getIntakePaymentStatus, startIntakePaystackCheckout } from "@/app/actions/paystack-checkout";
 import { submitRequestIntake } from "@/app/actions/request-intake";
 import { RequestIntakeSuccess } from "@/components/forms/RequestIntakeSuccess";
 import { STATE_LGAS, type SupportedState } from "@/lib/locations";
+import { amountKoboForTier, formatNgnFromKobo } from "@/lib/pricing";
 import { PRODUCTS } from "@/lib/products";
 import {
   MAX_DOCUMENTS,
@@ -87,9 +89,18 @@ type RequestIntakeFormProps = {
   captchaB: number;
   formStartedAt: number;
   persistenceConfigured: boolean;
+  paymentsConfigured: boolean;
+  paystackTestMode: boolean;
 };
 
-export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persistenceConfigured }: RequestIntakeFormProps) {
+export function RequestIntakeForm({
+  captchaA,
+  captchaB,
+  formStartedAt,
+  persistenceConfigured,
+  paymentsConfigured,
+  paystackTestMode,
+}: RequestIntakeFormProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const previousStateRef = useRef<string>("");
   /** Monotonic time at first client mount — used for the “wait 3s” rule (no client/server clock skew). */
@@ -98,7 +109,18 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
   const pageOpenMsRef = useRef<number>(0);
   const [rootMessage, setRootMessage] = useState<string | null>(null);
   const [mapMessage, setMapMessage] = useState<string | null>(null);
+  const [paymentServiceConsent, setPaymentServiceConsent] = useState(false);
+  const [intakePayment, setIntakePayment] = useState<null | {
+    reference: string;
+    productId: string;
+    emailHint: string;
+    tierLabel: string;
+    amountDisplay: string;
+  }>(null);
+  const [payBusy, setPayBusy] = useState(false);
+  const [paymentRefMessage, setPaymentRefMessage] = useState<string | null>(null);
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [success, setSuccess] = useState<null | { mode: "preview" | "live"; requestId?: string; email: string }>(null);
   const [stateChangedNotice, setStateChangedNotice] = useState(false);
 
@@ -119,6 +141,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
     setError,
     setValue,
     watch,
+    getValues,
+    trigger,
     formState: { errors, isSubmitting },
   } = useForm<RequestIntakeFormValues>({
     resolver: zodResolver(requestIntakeClientResolverSchema),
@@ -128,6 +152,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
   const liveCoordinates = watch("coordinates");
   const liveDescription = watch("land_location_description");
   const selectedLga = watch("lga");
+  const selectedProductId = watch("product_id");
+  const quoteKobo = amountKoboForTier(selectedProductId);
   const parsedFromCoordinates = parseCoordinatesValue(liveCoordinates);
   const previewPoint = parsedFromCoordinates;
   const hasLocationSelected = Boolean(previewPoint);
@@ -137,6 +163,39 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
       : ""
   ) as SupportedState | "";
   const availableLgas = selectedStateAsSupported ? STATE_LGAS[selectedStateAsSupported] : [];
+
+  const paymentRefParam = searchParams.get("payment_ref");
+  const payFirstLive = persistenceConfigured && paymentsConfigured;
+  const submitBlocked = payFirstLive && !intakePayment;
+
+  useEffect(() => {
+    if (!payFirstLive) return;
+    const ref = paymentRefParam?.trim();
+    if (!ref) return;
+
+    let cancelled = false;
+    setPaymentRefMessage(null);
+    void (async () => {
+      const s = await getIntakePaymentStatus(ref);
+      if (cancelled) return;
+      if (s.ok) {
+        setIntakePayment({
+          reference: ref,
+          productId: s.productId,
+          emailHint: s.emailHint,
+          tierLabel: s.tierLabel,
+          amountDisplay: s.amountDisplay,
+        });
+        setValue("product_id", s.productId, { shouldValidate: true, shouldDirty: true });
+        router.replace("/submit-request", { scroll: false });
+      } else {
+        setPaymentRefMessage(s.message);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [paymentRefParam, payFirstLive, router, setValue]);
 
   useEffect(() => {
     const previous = previousStateRef.current;
@@ -174,6 +233,9 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
   function handleSubmitAnother() {
     setSuccess(null);
     setRootMessage(null);
+    setPaymentServiceConsent(false);
+    setIntakePayment(null);
+    setPaymentRefMessage(null);
     reset(defaultValues);
     if (fileInputRef.current) fileInputRef.current.value = "";
     router.refresh();
@@ -215,6 +277,40 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
       if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) {
         el.focus();
       }
+    }
+  }
+
+  async function handlePayWithPaystack() {
+    setRootMessage(null);
+    const fieldsOk = await trigger(["email", "product_id"]);
+    if (!fieldsOk) {
+      setRootMessage("Enter a valid email and choose your verification tier before paying.");
+      return;
+    }
+    if (!paymentServiceConsent) {
+      setRootMessage("Tick the payment agreement to continue with Paystack checkout.");
+      return;
+    }
+    const v = getValues();
+    const pid = v.product_id;
+    if (pid !== "basic" && pid !== "standard" && pid !== "premium") {
+      setRootMessage("Select Basic, Standard, or Premium before paying.");
+      return;
+    }
+    setPayBusy(true);
+    try {
+      const res = await startIntakePaystackCheckout({
+        email: v.email.trim(),
+        product_id: pid,
+        payment_service_consent: true,
+      });
+      if (!res.ok) {
+        setRootMessage(res.message);
+        return;
+      }
+      window.location.href = res.authorization_url;
+    } finally {
+      setPayBusy(false);
     }
   }
 
@@ -262,6 +358,10 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
     fd.append("form_started_at", String(pageOpenMsRef.current > 0 ? pageOpenMsRef.current : formStartedAt));
     fd.append("website", values.website ?? "");
 
+    if (payFirstLive && intakePayment?.reference) {
+      fd.append("paystack_reference", intakePayment.reference);
+    }
+
     const files = fileInputRef.current?.files;
     fd.append("intake_file_count", String(files?.length ?? 0));
     if (files) {
@@ -291,6 +391,8 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
     }
 
     const submittedEmail = values.email.trim();
+    setIntakePayment(null);
+    setPaymentServiceConsent(false);
     setSuccess({ mode: result.mode, requestId: result.request_id, email: submittedEmail });
     reset(defaultValues);
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -310,6 +412,12 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
       {rootMessage ? (
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-900" role="alert">
           {rootMessage}
+        </div>
+      ) : null}
+
+      {paymentRefMessage ? (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-950 dark:border-amber-600/40 dark:bg-amber-950/35 dark:text-amber-100" role="status">
+          {paymentRefMessage}
         </div>
       ) : null}
 
@@ -347,6 +455,7 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
                 id="email"
                 type="email"
                 autoComplete="email"
+                disabled={Boolean(intakePayment)}
                 className={`${inputClass} mt-1.5`}
                 aria-invalid={errors.email ? "true" : "false"}
                 {...register("email")}
@@ -405,7 +514,12 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
             <label htmlFor="product_id" className="block text-sm font-medium text-[var(--lv-ink)]">
               Product <span className="text-red-600">*</span>
             </label>
-            <select id="product_id" className={`${inputClass} mt-1.5`} {...register("product_id")}>
+            <select
+              id="product_id"
+              disabled={Boolean(intakePayment)}
+              className={`${inputClass} mt-1.5`}
+              {...register("product_id")}
+            >
               <option value="" disabled>
                 Select a product
               </option>
@@ -422,6 +536,135 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
             ) : null}
           </div>
         </fieldset>
+
+        {persistenceConfigured ? (
+          <fieldset className="space-y-4 rounded-2xl border-2 border-[var(--lv-primary)]/40 bg-[var(--lv-card)] p-6 shadow-sm">
+            <legend className="px-1 text-base font-semibold text-[var(--lv-ink)]">
+              Payment service <span className="text-xs font-normal text-[var(--lv-ink-muted)]">(Paystack)</span>
+            </legend>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {!paymentsConfigured ? (
+                <span className="inline-flex items-center rounded-full bg-amber-100 px-3 py-1 text-xs font-semibold text-amber-950 dark:bg-amber-900/50 dark:text-amber-100">
+                  Checkout unavailable — add Paystack on the server
+                </span>
+              ) : paystackTestMode ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-100 px-3 py-1 text-xs font-semibold text-emerald-950 dark:bg-emerald-900/40 dark:text-emerald-100">
+                  Paystack test mode (demo / no real money with test cards)
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-800 dark:bg-slate-800 dark:text-slate-100">
+                  Live Paystack checkout
+                </span>
+              )}
+            </div>
+
+            <p className="text-sm leading-relaxed text-[var(--lv-ink-muted)]">
+              This section is a <strong className="text-[var(--lv-ink)]">separate payment service</strong> run by
+              Paystack. You do <strong className="text-[var(--lv-ink)]">not</strong> enter card or bank numbers on this
+              LandVerify page — only on Paystack after you continue.
+            </p>
+
+            <ol className="list-inside list-decimal space-y-2 text-sm text-[var(--lv-ink-muted)]">
+              <li>
+                Fill in your <strong className="text-[var(--lv-ink)]">email</strong> and choose your{" "}
+                <strong className="text-[var(--lv-ink)]">verification tier</strong> in the sections above.
+              </li>
+              <li>
+                Read the agreement below and tick the box — that is your acknowledgement to proceed with payment for
+                the selected tier.
+              </li>
+              <li>
+                Click <strong className="text-[var(--lv-ink)]">Pay with Paystack</strong> (when enabled). A new step
+                opens on <strong className="text-[var(--lv-ink)]">Paystack</strong> where you enter payment details
+                (card, bank transfer, USSD, etc., depending on what Paystack offers).
+              </li>
+              <li>
+                After Paystack shows success, you return here; then complete the rest of the form and use{" "}
+                <strong className="text-[var(--lv-ink)]">Submit details</strong>.
+              </li>
+            </ol>
+
+            {paymentsConfigured && paystackTestMode ? (
+              <p className="text-sm text-[var(--lv-ink-muted)]">
+                Use Paystack&apos;s test cards and OTP flows — see{" "}
+                <a
+                  href="https://paystack.com/docs/payments/test-payments"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-semibold text-[var(--lv-primary)] underline-offset-2 hover:underline"
+                >
+                  Paystack test payments
+                </a>
+                .
+              </p>
+            ) : null}
+
+            {quoteKobo != null && selectedProductId ? (
+              <p className="text-sm font-medium text-[var(--lv-ink)]">
+                Amount for selected tier:{" "}
+                <span className="text-[var(--lv-primary)]">{formatNgnFromKobo(quoteKobo)}</span>
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--lv-ink-faint)]">Select a product tier above to see the amount.</p>
+            )}
+
+            {paymentsConfigured ? (
+              <>
+                <div className="flex gap-3 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 p-4">
+                  <input
+                    id="payment_service_consent"
+                    type="checkbox"
+                    className="mt-1 h-4 w-4 shrink-0 rounded border-[var(--lv-border)] text-[var(--lv-primary)] focus:ring-[var(--lv-primary)]"
+                    checked={paymentServiceConsent}
+                    onChange={(e) => setPaymentServiceConsent(e.target.checked)}
+                  />
+                  <label htmlFor="payment_service_consent" className="text-sm leading-relaxed text-[var(--lv-ink)]">
+                    I understand this section is a <strong className="text-[var(--lv-ink)]">payment service</strong>.
+                    By ticking this box and continuing to Paystack, I agree I am purchasing the verification tier shown
+                    above and I want LandVerify to deliver that paid service after I submit this request form.
+                  </label>
+                </div>
+                {intakePayment ? (
+                  <div className="rounded-xl border border-green-600/30 bg-green-50/90 px-4 py-3 text-sm text-green-950 dark:border-green-700/40 dark:bg-green-950/35 dark:text-green-100">
+                    <p className="font-semibold text-green-900 dark:text-green-200">Paystack payment confirmed</p>
+                    <p className="mt-1 text-green-900/90 dark:text-green-100/90">
+                      {intakePayment.tierLabel} ({intakePayment.amountDisplay}). Use the same email you paid with; it
+                      should match <span className="font-mono font-medium">{intakePayment.emailHint}</span>.
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => void handlePayWithPaystack()}
+                    disabled={payBusy}
+                    className="inline-flex w-full min-h-12 items-center justify-center rounded-xl bg-[var(--lv-primary)] px-4 py-3 text-sm font-semibold text-white shadow-sm transition hover:opacity-95 disabled:opacity-60 sm:w-auto"
+                  >
+                    {payBusy ? "Opening Paystack checkout…" : "Continue to Paystack to enter payment details"}
+                  </button>
+                )}
+              </>
+            ) : (
+              <div className="space-y-3 rounded-xl border border-amber-200 bg-amber-50/90 px-4 py-4 text-sm text-amber-950 dark:border-amber-700/40 dark:bg-amber-950/30 dark:text-amber-100">
+                <p>
+                  <strong className="text-[var(--lv-ink)]">Paystack is not configured on this deployment.</strong> Add
+                  the server variable{" "}
+                  <code className="rounded bg-[var(--lv-muted)] px-1 text-xs text-[var(--lv-ink)]">PAYSTACK_SECRET_KEY</code>{" "}
+                  (test key <code className="text-xs">sk_test_…</code> or live <code className="text-xs">sk_live_…</code>)
+                  in Vercel, redeploy, then refresh this page. The acknowledgement and Paystack button will activate
+                  automatically.
+                </p>
+                <button
+                  type="button"
+                  disabled
+                  className="inline-flex w-full cursor-not-allowed min-h-12 items-center justify-center rounded-xl border border-amber-300/80 bg-amber-100/50 px-4 py-3 text-sm font-semibold text-amber-900/70 dark:border-amber-800 dark:bg-amber-950/50 dark:text-amber-200/60 sm:w-auto"
+                >
+                  Pay with Paystack (configure server to enable)
+                </button>
+              </div>
+            )}
+          </fieldset>
+        ) : null}
 
         <fieldset className="space-y-4 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-6 shadow-sm">
           <legend className="px-1 text-lg font-semibold text-[var(--lv-ink)]">Land location</legend>
@@ -720,15 +963,23 @@ export function RequestIntakeForm({ captchaA, captchaB, formStartedAt, persisten
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
           <button
             type="submit"
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting ||
+              submitBlocked ||
+              (persistenceConfigured && !paymentsConfigured)
+            }
             className="inline-flex min-h-12 min-w-[10rem] items-center justify-center rounded-lg bg-[var(--lv-primary)] px-6 text-sm font-semibold text-white shadow-md hover:opacity-95 disabled:opacity-60"
           >
             {isSubmitting ? "Checking…" : "Submit details"}
           </button>
           <p className="text-xs text-[var(--lv-ink-faint)]">
-            {persistenceConfigured
-              ? "Submitted requests are stored securely while we process your verification."
-              : "Database not configured on this server—contact will not persist until Supabase credentials are added."}
+            {persistenceConfigured && !paymentsConfigured
+              ? "Configure Paystack to enable live submissions."
+              : payFirstLive && submitBlocked
+                ? "Complete Paystack payment above first — the submit button stays disabled until payment succeeds."
+                : persistenceConfigured
+                  ? "Payment is confirmed on Paystack before you can submit; your tier is saved with your case."
+                  : "Database not configured on this server—contact will not persist until Supabase credentials are added."}
           </p>
         </div>
       </form>

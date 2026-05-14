@@ -84,17 +84,27 @@ create index if not exists request_status_events_request_id_idx
 
 create table if not exists public.payments (
   id bigserial primary key,
-  request_id uuid not null references public.requests(id) on delete cascade,
+  request_id uuid references public.requests(id) on delete cascade,
   provider text,
   reference text,
   amount_kobo bigint,
   currency text default 'NGN',
   status text not null default 'pending',
   verified_at timestamptz,
+  paid_at timestamptz,
+  paystack_access_code text,
+  metadata jsonb not null default '{}'::jsonb,
+  card_origin text,
+  channel text,
+  customer_email text,
   created_at timestamptz not null default now()
 );
 
 create index if not exists payments_request_id_idx on public.payments(request_id);
+
+create unique index if not exists payments_reference_unique
+  on public.payments (reference)
+  where reference is not null;
 
 create table if not exists public.report_outputs (
   id bigserial primary key,

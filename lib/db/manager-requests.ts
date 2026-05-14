@@ -48,11 +48,26 @@ export type RequestMessage = {
   channel: "case" | "internal" | string;
 };
 
+export type RequestPayment = {
+  id: number;
+  reference: string | null;
+  amount_kobo: number | null;
+  currency: string | null;
+  status: string;
+  channel: string | null;
+  card_origin: string | null;
+  customer_email: string | null;
+  verified_at: string | null;
+  paid_at: string | null;
+  created_at: string;
+};
+
 export type ManagerRequestDetail = {
   request: Record<string, unknown> | null;
   events: RequestStatusEvent[];
   findings: AgentFinding[];
   messages: RequestMessage[];
+  payments: RequestPayment[];
 };
 
 export async function getManagerRequestSummaries(): Promise<ManagerRequestSummary[]> {
@@ -123,14 +138,14 @@ export async function getRequestDetailByCode(requestCode: string): Promise<Manag
   const code = requestCode.toUpperCase();
   const { data: request } = await supabase.from("requests").select("*").eq("request_code", code).maybeSingle();
   if (!request) {
-    return { request: null, events: [], findings: [], messages: [] };
+    return { request: null, events: [], findings: [], messages: [], payments: [] };
   }
 
   const requestId = String((request as { id: string }).id);
 
   await markCaseRequesterMessagesReadByAdmin(requestId);
 
-  const [{ data: events }, { data: findings }, { data: messages }] = await Promise.all([
+  const [{ data: events }, { data: findings }, { data: messages }, { data: payments }] = await Promise.all([
     supabase
       .from("request_status_events")
       .select("status, note, actor, created_at")
@@ -150,6 +165,14 @@ export async function getRequestDetailByCode(requestCode: string): Promise<Manag
       .eq("request_id", requestId)
       .order("created_at", { ascending: true })
       .limit(200),
+    supabase
+      .from("payments")
+      .select(
+        "id, reference, amount_kobo, currency, status, channel, card_origin, customer_email, verified_at, paid_at, created_at",
+      )
+      .eq("request_id", requestId)
+      .order("created_at", { ascending: false })
+      .limit(30),
   ]);
 
   return {
@@ -157,5 +180,6 @@ export async function getRequestDetailByCode(requestCode: string): Promise<Manag
     events: (events ?? []) as RequestStatusEvent[],
     findings: (findings ?? []) as AgentFinding[],
     messages: (messages ?? []) as RequestMessage[],
+    payments: (payments ?? []) as RequestPayment[],
   };
 }

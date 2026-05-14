@@ -1,6 +1,7 @@
 "use server";
 
 import { timelineDetailFromStatus, timelineIndexFromStatus, type RequestStatus } from "@/lib/db/request-status";
+import { formatNgnFromKobo, tierLabel } from "@/lib/pricing";
 import { getSupabaseAdminClient, isSupabaseConfigured } from "@/lib/supabase/admin";
 import { trackRequestSchema } from "@/lib/validations/track-request";
 
@@ -20,6 +21,17 @@ export type TrackRequestHistoryEntry = {
   created_at: string;
 };
 
+export type TrackRequestReceipt = {
+  amount_kobo: number;
+  amount_display: string;
+  reference: string;
+  paid_at: string | null;
+  verified_at: string | null;
+  card_origin: string | null;
+  channel: string | null;
+  tier_label: string;
+};
+
 export type TrackRequestActionResult =
   | {
       ok: true;
@@ -32,6 +44,12 @@ export type TrackRequestActionResult =
       history?: TrackRequestHistoryEntry[];
       /** Present in live mode: case channel only */
       case_messages?: TrackCaseMessagePublic[];
+      /** Live: from `requests` */
+      payment_status?: string;
+      product_id?: string;
+      full_name?: string;
+      /** Live: latest successful Paystack row */
+      receipt?: TrackRequestReceipt | null;
     }
   | {
       ok: false;
@@ -72,7 +90,7 @@ export async function lookupTrackRequest(input: unknown): Promise<TrackRequestAc
   const supabase = getSupabaseAdminClient();
   const { data: request, error } = await supabase
     .from("requests")
-    .select("id, request_code, status")
+    .select("id, request_code, status, payment_status, product_id, full_name")
     .eq("request_code", parsed.data.request_id.trim().toUpperCase())
     .eq("email_normalized", parsed.data.email.trim().toLowerCase())
     .single();
@@ -122,6 +140,33 @@ export async function lookupTrackRequest(input: unknown): Promise<TrackRequestAc
       created_at: String(row.created_at),
     }));
 
+  let receipt: TrackRequestReceipt | null = null;
+  const paymentStatus = String((request as { payment_status?: string }).payment_status ?? "").toLowerCase();
+  if (paymentStatus === "paid") {
+    const { data: lastPay } = await supabase
+      .from("payments")
+      .select("amount_kobo, reference, paid_at, verified_at, card_origin, channel, status")
+      .eq("request_id", request.id)
+      .eq("status", "success")
+      .order("verified_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (lastPay?.reference != null && lastPay.amount_kobo != null) {
+      const productId = String((request as { product_id?: string }).product_id ?? "");
+      receipt = {
+        amount_kobo: Number(lastPay.amount_kobo),
+        amount_display: formatNgnFromKobo(Number(lastPay.amount_kobo)),
+        reference: String(lastPay.reference),
+        paid_at: (lastPay.paid_at as string | null) ?? null,
+        verified_at: (lastPay.verified_at as string | null) ?? null,
+        card_origin: (lastPay.card_origin as string | null) ?? null,
+        channel: (lastPay.channel as string | null) ?? null,
+        tier_label: tierLabel(productId),
+      };
+    }
+  }
+
   return {
     ok: true,
     mode: "live",
@@ -132,5 +177,9 @@ export async function lookupTrackRequest(input: unknown): Promise<TrackRequestAc
     timeline_detail: timelineDetailFromStatus(currentStatus),
     history,
     case_messages,
+    payment_status: String((request as { payment_status?: string }).payment_status ?? ""),
+    product_id: String((request as { product_id?: string }).product_id ?? ""),
+    full_name: String((request as { full_name?: string }).full_name ?? ""),
+    receipt,
   };
 }

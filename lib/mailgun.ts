@@ -18,6 +18,8 @@ export type SendMailgunEmailParams = {
   to: string;
   subject: string;
   text: string;
+  /** Optional HTML body (Mailgun `html` field). */
+  html?: string;
 };
 
 /** Returns true if sent, false if Mailgun env missing (caller may log). */
@@ -38,6 +40,9 @@ export async function sendMailgunEmail(params: SendMailgunEmailParams): Promise<
   body.set("to", params.to);
   body.set("subject", params.subject);
   body.set("text", params.text);
+  if (params.html) {
+    body.set("html", params.html);
+  }
 
   const auth = Buffer.from(`api:${apiKey}`).toString("base64");
 
