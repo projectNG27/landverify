@@ -24,34 +24,84 @@ const STEPS = [
   { key: "completed", label: "Completed", detail: "Report has been sent and case completed." },
 ] as const;
 
+const RAIL_W = "w-12";
+
 function TimelinePreview({ activeIndex }: { activeIndex: number }) {
+  const total = STEPS.length;
+  const stepNum = Math.min(activeIndex + 1, total);
+
   return (
-    <ol className="relative mt-6 space-y-0 border-l border-[var(--lv-border)] pl-6">
-      {STEPS.map((step, i) => {
-        const done = i < activeIndex;
-        const current = i === activeIndex;
-        return (
-          <li key={step.key} className="relative pb-8 last:pb-0">
-            <span
-              className={`absolute -left-[calc(0.25rem+1px)] top-1 flex h-3 w-3 rounded-full border-2 border-[var(--lv-surface)] ${
-                done
-                  ? "bg-[var(--lv-primary)]"
-                  : current
-                    ? "bg-[var(--lv-accent)] ring-2 ring-[var(--lv-primary)]/40"
-                    : "bg-[var(--lv-border)]"
-              }`}
-              aria-hidden
-            />
-            <p
-              className={`text-sm font-semibold ${done || current ? "text-[var(--lv-ink)]" : "text-[var(--lv-ink-muted)]"}`}
-            >
-              {step.label}
-            </p>
-            <p className="mt-0.5 text-xs text-[var(--lv-ink-muted)]">{step.detail}</p>
-          </li>
-        );
-      })}
-    </ol>
+    <div className="mt-8">
+      <p className="text-xs text-[var(--lv-ink-muted)]">
+        Step <span className="font-semibold text-[var(--lv-ink)]">{stepNum}</span> of {total}
+      </p>
+      <ol className="mt-4" aria-label="Request progress">
+        {STEPS.map((step, i) => {
+          const done = i < activeIndex;
+          const current = i === activeIndex;
+          const isLast = i === total - 1;
+
+          return (
+            <li key={step.key} aria-current={current ? "step" : undefined}>
+              {i > 0 ? (
+                <div className="flex gap-4">
+                  <div className={`flex ${RAIL_W} shrink-0 justify-center py-1`}>
+                    <div
+                      className={`h-6 w-px shrink-0 ${i - 1 < activeIndex ? "bg-[var(--lv-primary)]/45" : "bg-[var(--lv-border)]"}`}
+                      aria-hidden
+                    />
+                  </div>
+                  <div className="min-w-0 flex-1" aria-hidden />
+                </div>
+              ) : null}
+
+              <div className="flex gap-4">
+                <div className={`flex ${RAIL_W} shrink-0 justify-center`}>
+                  {done ? (
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[var(--lv-primary)] text-sm font-bold leading-none text-white shadow-sm ring-4 ring-[var(--lv-primary)]/15"
+                      aria-hidden
+                    >
+                      ✓
+                    </span>
+                  ) : current ? (
+                    <span
+                      className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-[3px] border-[var(--lv-primary)] bg-[var(--lv-surface)] shadow-[0_0_0_6px_color-mix(in_oklab,var(--lv-primary)_18%,transparent)]"
+                      aria-hidden
+                    >
+                      <span className="h-2.5 w-2.5 rounded-full bg-[var(--lv-primary)]" />
+                    </span>
+                  ) : (
+                    <span
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[var(--lv-border)] bg-[var(--lv-card)]"
+                      aria-hidden
+                    />
+                  )}
+                </div>
+
+                <div className={`min-w-0 flex-1 ${isLast ? "" : "pb-6"}`}>
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <p
+                      className={`text-base font-semibold leading-snug tracking-tight ${
+                        done || current ? "text-[var(--lv-ink)]" : "text-[var(--lv-ink-muted)]"
+                      }`}
+                    >
+                      {step.label}
+                    </p>
+                    {current ? (
+                      <span className="rounded-full bg-[var(--lv-primary)]/18 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[var(--lv-primary)]">
+                        Current
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-1.5 max-w-prose text-sm leading-relaxed text-[var(--lv-ink-muted)]">{step.detail}</p>
+                </div>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
   );
 }
 
@@ -205,21 +255,26 @@ export function TrackRequestForm() {
             )}
             <TimelinePreview activeIndex={activeIndex} />
             {liveOk && result.payment_status ? (
-              <p className="mt-4 text-sm text-[var(--lv-ink-muted)]">
-                Payment:{" "}
-                <span className="font-semibold capitalize text-[var(--lv-ink)]">{result.payment_status}</span>
-                {String(result.payment_status).toLowerCase() !== "paid" ? (
+              <div className="mt-6 flex flex-wrap items-center gap-3 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/25 px-4 py-3">
+                <span className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Payment</span>
+                {String(result.payment_status).toLowerCase() === "paid" ? (
+                  <span className="inline-flex items-center rounded-full bg-emerald-500/18 px-3 py-1 text-xs font-bold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+                    Paid
+                  </span>
+                ) : (
                   <>
-                    {" · "}
+                    <span className="inline-flex items-center rounded-full bg-amber-500/18 px-3 py-1 text-xs font-bold capitalize text-amber-900 dark:text-amber-200">
+                      {result.payment_status}
+                    </span>
                     <Link
                       href={`/pay?code=${encodeURIComponent(result.request_id)}`}
-                      className="font-semibold text-[var(--lv-primary)] underline-offset-2 hover:underline"
+                      className="text-sm font-semibold text-[var(--lv-primary)] underline-offset-2 hover:underline"
                     >
                       Pay online with Paystack
                     </Link>
                   </>
-                ) : null}
-              </p>
+                )}
+              </div>
             ) : null}
             {history ? (
               <div className="mt-8 border-t border-[var(--lv-border)] pt-6">
