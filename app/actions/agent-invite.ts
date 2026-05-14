@@ -209,10 +209,25 @@ export async function registerAgentWithInviteAction(_: AgentRegisterState, formD
 
   if (insertErr || !agentRow) {
     await supabase.from("agent_invites").update({ used_at: null, used_by_agent_id: null }).eq("id", inviteId);
-    const msg = insertErr?.message?.includes("duplicate") || insertErr?.code === "23505"
-      ? "That username or email is already registered."
-      : "Could not create your account. Check your details and try again.";
-    return { ok: false, error: msg };
+    console.error("registerAgentWithInviteAction insert", insertErr);
+    const raw = (insertErr?.message ?? "").toLowerCase();
+    if (insertErr?.code === "23505" || raw.includes("duplicate")) {
+      return { ok: false, error: "That username or email is already registered." };
+    }
+    if (raw.includes("coverage_states") || (raw.includes("column") && raw.includes("does not exist"))) {
+      return {
+        ok: false,
+        error:
+          "Registration cannot complete yet: the database is missing the latest update (agents.coverage_states). Ask your administrator to run migrations, then use the same invite link again.",
+      };
+    }
+    return {
+      ok: false,
+      error:
+        insertErr?.message && insertErr.message.length < 220
+          ? `Could not create your account: ${insertErr.message}`
+          : "Could not create your account. Check your details and try again.",
+    };
   }
 
   await supabase.from("agent_invites").update({ used_by_agent_id: agentRow.id as string }).eq("id", inviteId);

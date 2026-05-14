@@ -1,9 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import Link from "next/link";
 import { registerAgentWithInviteAction, type AgentRegisterState } from "@/app/actions/agent-invite";
 import { AgentCoverageStateCheckboxes } from "@/components/agent/AgentCoverageStateCheckboxes";
+import { evaluatePasswordHint } from "@/lib/password-hints";
 
 const initial: AgentRegisterState = { ok: false };
 
@@ -25,6 +26,23 @@ export function AgentRegistrationForm({
   inviteSig?: string;
 }) {
   const [state, action, pending] = useActionState(registerAgentWithInviteAction, initial);
+  const [password, setPassword] = useState("");
+  const [password2, setPassword2] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+
+  const hint = useMemo(() => evaluatePasswordHint(password), [password]);
+  const passwordsMatch = useMemo(() => {
+    if (password2.length === 0) return null;
+    return password === password2;
+  }, [password, password2]);
+
+  const passwordInputType = showPassword ? "text" : "password";
+  const submitBlocked =
+    pending ||
+    password.length < 8 ||
+    password2.length < 8 ||
+    password !== password2 ||
+    hint.level === "weak";
 
   return (
     <form action={action} className="space-y-5 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-6 shadow-sm">
@@ -76,17 +94,85 @@ export function AgentRegistrationForm({
           </label>
           <input id="reg_username" name="username" className={inputClass} required autoComplete="username" minLength={3} />
         </div>
-        <div>
-          <label htmlFor="reg_password" className="text-xs font-medium text-[var(--lv-ink)]">
-            Password
-          </label>
-          <input id="reg_password" name="password" type="password" className={inputClass} required minLength={8} autoComplete="new-password" />
+        <div className="sm:col-span-2">
+          <div className="flex flex-wrap items-end justify-between gap-2">
+            <label htmlFor="reg_password" className="text-xs font-medium text-[var(--lv-ink)]">
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={() => setShowPassword((s) => !s)}
+              className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-muted)]/50 px-3 py-1.5 text-xs font-semibold text-[var(--lv-ink)] hover:bg-[var(--lv-muted)]"
+            >
+              {showPassword ? "Hide" : "Show"}
+            </button>
+          </div>
+          <input
+            id="reg_password"
+            name="password"
+            type={passwordInputType}
+            className={inputClass}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            aria-invalid={hint.level === "weak" ? true : undefined}
+          />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="reg_password2" className="text-xs font-medium text-[var(--lv-ink)]">
             Confirm password
           </label>
-          <input id="reg_password2" name="password_confirm" type="password" className={inputClass} required minLength={8} autoComplete="new-password" />
+          <input
+            id="reg_password2"
+            name="password_confirm"
+            type={passwordInputType}
+            className={inputClass}
+            required
+            minLength={8}
+            autoComplete="new-password"
+            value={password2}
+            onChange={(e) => setPassword2(e.target.value)}
+            aria-invalid={passwordsMatch === false ? true : undefined}
+          />
+        </div>
+        <div className="sm:col-span-2 space-y-2" role="status" aria-live="polite">
+          {password.length > 0 && hint.level !== "empty" ? (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs ${
+                hint.level === "weak"
+                  ? "border-amber-400/60 bg-amber-50/90 text-amber-950 dark:border-amber-800/50 dark:bg-amber-950/35 dark:text-amber-100"
+                  : hint.level === "fair"
+                    ? "border-[var(--lv-border)] bg-[var(--lv-muted)]/30 text-[var(--lv-ink-muted)]"
+                    : "border-emerald-500/40 bg-emerald-50/90 text-emerald-950 dark:border-emerald-800/50 dark:bg-emerald-950/35 dark:text-emerald-100"
+              }`}
+            >
+              <p className="font-semibold text-[var(--lv-ink)] dark:text-inherit">{hint.summary}</p>
+              {hint.issues.length > 0 ? (
+                <ul className="mt-1 list-inside list-disc text-[var(--lv-ink-muted)] dark:text-amber-100/90">
+                  {hint.issues.map((issue) => (
+                    <li key={issue}>{issue}</li>
+                  ))}
+                </ul>
+              ) : null}
+            </div>
+          ) : null}
+          {passwordsMatch === true ? (
+            <p className="flex items-center gap-2 text-sm font-medium text-emerald-700 dark:text-emerald-400">
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs text-white" aria-hidden>
+                ✓
+              </span>
+              Passwords match
+            </p>
+          ) : passwordsMatch === false ? (
+            <p className="flex items-center gap-2 text-sm font-medium text-red-700 dark:text-red-400">
+              <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-red-600 text-xs text-white" aria-hidden>
+                ✕
+              </span>
+              Passwords do not match
+            </p>
+          ) : null}
         </div>
       </div>
 
@@ -125,7 +211,7 @@ export function AgentRegistrationForm({
 
       <button
         type="submit"
-        disabled={pending}
+        disabled={submitBlocked}
         className="inline-flex w-full min-h-12 items-center justify-center rounded-xl bg-[var(--lv-primary)] px-4 text-sm font-semibold text-white shadow-sm hover:opacity-95 disabled:opacity-60"
       >
         {pending ? "Creating account…" : "Create account"}
