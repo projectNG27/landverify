@@ -65,11 +65,23 @@ export async function paystackInitializeTransaction(params: {
     }),
   });
 
-  const json = (await res.json()) as {
+  let json: {
     status: boolean;
     message: string;
     data?: { authorization_url: string; access_code: string; reference: string };
   };
+  try {
+    json = (await res.json()) as typeof json;
+  } catch {
+    return { ok: false, message: `Paystack returned HTTP ${res.status} (invalid response).` };
+  }
+
+  if (!res.ok) {
+    return {
+      ok: false,
+      message: json.message || `Paystack rejected the request (HTTP ${res.status}). Check the secret key and callback URL.`,
+    };
+  }
 
   if (!json.status || !json.data?.authorization_url) {
     return { ok: false, message: json.message || "Could not start Paystack checkout." };

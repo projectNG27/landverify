@@ -308,7 +308,16 @@ export function RequestIntakeForm({
         setRootMessage(res.message);
         return;
       }
-      window.location.href = res.authorization_url;
+      const url = res.authorization_url?.trim();
+      if (!url) {
+        setRootMessage("Paystack did not return a checkout link. Check Vercel logs and your Paystack dashboard.");
+        return;
+      }
+      window.location.assign(url);
+    } catch (e) {
+      setRootMessage(
+        e instanceof Error ? e.message : "Checkout failed unexpectedly. Open the browser console and try again.",
+      );
     } finally {
       setPayBusy(false);
     }

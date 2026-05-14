@@ -30,7 +30,12 @@ export function PayRequestForm({ defaultRequestId = "" }: Props) {
       setServerMessage(res.message);
       return;
     }
-    window.location.href = res.authorization_url;
+    const url = res.authorization_url?.trim();
+    if (!url) {
+      setServerMessage("Paystack did not return a checkout link.");
+      return;
+    }
+    window.location.assign(url);
   }
 
   const productIdGuess = "basic";

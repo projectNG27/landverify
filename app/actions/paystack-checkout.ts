@@ -129,6 +129,19 @@ export async function startIntakePaystackCheckout(input: unknown): Promise<Payst
 
   if (insErr || !inserted) {
     console.error("startIntakePaystackCheckout insert failed", insErr);
+    const raw = (insErr?.message ?? "").toLowerCase();
+    const needsMigration =
+      raw.includes("request_id") ||
+      raw.includes("null value") ||
+      raw.includes("not-null") ||
+      raw.includes("violates");
+    if (needsMigration) {
+      return {
+        ok: false,
+        message:
+          "Database is blocking pay-first checkout: apply the Supabase migration that allows `payments.request_id` to be null (file `20260514_payments_request_id_nullable.sql`), then try again.",
+      };
+    }
     return { ok: false, message: "Could not start payment. Try again shortly." };
   }
 
