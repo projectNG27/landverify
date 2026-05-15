@@ -20,6 +20,8 @@ type Props = {
   messages: CasePackMessage[];
   customerDocLinks: CasePackDocLink[];
   agentDocLinks: CasePackDocLink[];
+  /** When intakes recorded filenames but no files were stored — listed in the pack for context only. */
+  customerFilenamesOnly?: string[];
 };
 
 const MAX_SHARE_CHARS = 3600;
@@ -40,6 +42,45 @@ function truncateForShare(body: string, max = MAX_SHARE_CHARS): string {
 const PACK_DISCLAIMER =
   "LandVerify provides professional land verification insights — not government title proof.";
 
+function normalizeWs(s: string): string {
+  return s.replace(/\s+/g, " ").trim();
+}
+
+function looksLikeCoordPair(line: string): boolean {
+  return /^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(line.trim());
+}
+
+/** Avoid repeating the same Maps URL / coordinate pair from intake text and structured fields. */
+function buildPackLocationLines(
+  landLocationDescription: string,
+  googleMapsLink: string | null,
+  coordinatesLine: string | null,
+): string[] {
+  const maps = googleMapsLink?.trim() ?? "";
+  const coords = coordinatesLine?.trim() ?? "";
+  const raw = landLocationDescription.trim();
+  const coordNorm = coords ? normalizeWs(coords.replace(/\s*,\s*/, ", ")) : "";
+
+  const descLines = raw ? raw.split(/\r?\n/).map((l) => l.trim()).filter(Boolean) : [];
+  const filtered = descLines.filter((line) => {
+    const n = normalizeWs(line).replace(/\s*,\s*/, ", ");
+    if (maps && (line === maps || n === normalizeWs(maps))) return false;
+    if (coords && (n === coordNorm || looksLikeCoordPair(line))) return false;
+    if (maps && /^https?:\/\/(www\.)?google\.com\/maps/i.test(line)) return false;
+    return true;
+  });
+
+  const out: string[] = [];
+  if (filtered.length > 0) {
+    out.push("Additional notes:", ...filtered, "");
+  }
+  if (maps) out.push(`Google Maps: ${maps}`);
+  if (coords) out.push(`Coordinates: ${coords}`);
+  if (out.length === 0 && raw) out.push(raw);
+  if (out.length === 0) out.push("(No location details stored.)");
+  return out;
+}
+
 export function AgentCasePackPanel({
   taskAbsoluteUrl,
   requestCode,
@@ -53,6 +94,7 @@ export function AgentCasePackPanel({
   messages,
   customerDocLinks,
   agentDocLinks,
+  customerFilenamesOnly = [],
 }: Props) {
   const [copyMsg, setCopyMsg] = useState<string | null>(null);
 
@@ -67,14 +109,16 @@ export function AgentCasePackPanel({
       `SLA: ${slaText}`,
       "",
       "— Location —",
-      landLocationDescription,
-      googleMapsLink ? `Maps: ${googleMapsLink}` : "",
-      coordinatesLine ? `Coordinates: ${coordinatesLine}` : "",
+      ...buildPackLocationLines(landLocationDescription, googleMapsLink, coordinatesLine),
       "",
       "— Agent findings —",
     ];
-    for (const f of findings) {
-      lines.push(`[${f.section_key}]`, f.findings, "");
+    if (findings.length === 0) {
+      lines.push("(No findings saved yet — use the findings form on this task page in LandVerify.)", "");
+    } else {
+      for (const f of findings) {
+        lines.push(`[${f.section_key}]`, f.findings, "");
+      }
     }
     if (messages.length) {
       lines.push("— Internal thread (manager / agent) —");
@@ -86,6 +130,15 @@ export function AgentCasePackPanel({
       lines.push("— Customer documents (signed links; refresh task page if expired) —");
       for (const d of customerDocLinks) {
         lines.push(`${d.filename} (${Math.round(d.size / 1024)} KB): ${d.url}`);
+      }
+      lines.push("");
+    } else if (customerFilenamesOnly.length > 0) {
+      lines.push(
+        "— Customer documents (filenames only at intake — files are not in LandVerify storage yet) —",
+        "Ask your manager to attach the files on this request if you need signed download links.",
+      );
+      for (const name of customerFilenamesOnly) {
+        lines.push(`- ${name}`);
       }
       lines.push("");
     }
@@ -113,6 +166,7 @@ export function AgentCasePackPanel({
     messages,
     customerDocLinks,
     agentDocLinks,
+    customerFilenamesOnly,
   ]);
 
   const shareText = useMemo(() => truncateForShare(fullText), [fullText]);

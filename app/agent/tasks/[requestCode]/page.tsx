@@ -6,6 +6,7 @@ import { agentLogoutAction } from "@/app/actions/agent-auth";
 import { AgentAcceptTaskForm, AgentFindingsForm, AgentMessageForm } from "@/components/agent/AgentTaskActionForms";
 import { AgentCasePackPanel } from "@/components/agent/AgentCasePackPanel";
 import { AgentResponseAttachmentsSection } from "@/components/agent/AgentResponseAttachmentsSection";
+import { AgentTaskLocationBlock } from "@/components/agent/AgentTaskLocationBlock";
 import { RequestAttachmentDownloads } from "@/components/shared/RequestAttachmentDownloads";
 import { getAgentSessionUser } from "@/lib/admin-auth";
 import { agentNeedsOnboarding, getAgentRowForSession } from "@/lib/agent-profile";
@@ -144,6 +145,7 @@ export default async function AgentTaskPage({ params }: Props) {
           }))}
           customerDocLinks={customerLinks.map((l) => ({ filename: l.filename, url: l.url, size: l.size }))}
           agentDocLinks={agentLinks.map((l) => ({ filename: l.filename, url: l.url, size: l.size }))}
+          customerFilenamesOnly={storedDocs.length === 0 ? nameOnlyDocs : []}
         />
 
         <AgentResponseAttachmentsSection
@@ -154,18 +156,12 @@ export default async function AgentTaskPage({ params }: Props) {
         <section className="rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-4 shadow-sm sm:p-5">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Task context</h2>
           <dl className="mt-3 grid gap-3 text-sm">
-            <div>
-              <dt className="text-[var(--lv-ink-faint)]">Location details</dt>
-              <dd className="text-[var(--lv-ink)]">{request.land_location_description}</dd>
-            </div>
-            <div>
-              <dt className="text-[var(--lv-ink-faint)]">Google maps</dt>
-              <dd className="break-all text-[var(--lv-ink)]">{request.google_maps_link ?? "—"}</dd>
-            </div>
-            <div>
-              <dt className="text-[var(--lv-ink-faint)]">Coordinates</dt>
-              <dd className="text-[var(--lv-ink)]">{coordsLine ?? "—"}</dd>
-            </div>
+            <AgentTaskLocationBlock
+              landLocationDescription={request.land_location_description ? String(request.land_location_description) : ""}
+              googleMapsLink={request.google_maps_link ? String(request.google_maps_link) : null}
+              coordinatesLat={request.coordinates_lat}
+              coordinatesLng={request.coordinates_lng}
+            />
           </dl>
 
           <div className="mt-5 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/30 p-4">
@@ -181,7 +177,17 @@ export default async function AgentTaskPage({ params }: Props) {
               </div>
             ) : null}
             {storedDocs.length === 0 && nameOnlyDocs.length > 0 ? (
-              <p className="mt-3 text-sm text-[var(--lv-ink-muted)]">Filenames only: {nameOnlyDocs.join(", ")}</p>
+              <div className="mt-3 space-y-2 text-sm text-[var(--lv-ink-muted)]">
+                <p>
+                  <span className="font-semibold text-[var(--lv-ink)]">Filenames only:</span> {nameOnlyDocs.join(", ")}
+                </p>
+                <p className="text-xs leading-relaxed text-[var(--lv-ink-faint)]">
+                  The customer listed these files at intake, but the PDFs are not stored in LandVerify yet — there is
+                  nothing to open or download here until a manager uploads them on this request. Use{" "}
+                  <strong>Open in Google Maps</strong> above for the pin; use <strong>Case pack → Copy all</strong> to
+                  share the filename list.
+                </p>
+              </div>
             ) : null}
             {storedDocs.length === 0 && nameOnlyDocs.length === 0 ? (
               <p className="mt-3 text-sm text-[var(--lv-ink-faint)]">No documents attached.</p>

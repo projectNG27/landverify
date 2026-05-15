@@ -89,26 +89,47 @@ export function AgentDashboardShell({
         </div>
       </div>
 
-      <div className="mt-6 -mx-1 flex gap-1 overflow-x-auto pb-1 sm:mx-0 sm:flex-wrap sm:overflow-visible">
-        {tabDefs.map((t) => (
-          <button
-            key={t.id}
-            type="button"
-            onClick={() => setTab(t.id)}
-            className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition min-h-11 sm:min-h-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lv-primary)] ${
-              tab === t.id
-                ? "bg-[var(--lv-primary)] text-white shadow-sm"
-                : "border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 text-[var(--lv-ink)] hover:bg-[var(--lv-muted)]/70"
-            }`}
+      <div className="mt-6">
+        <label className="mb-3 block sm:hidden">
+          <span className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">
+            Show cases
+          </span>
+          <select
+            value={tab}
+            onChange={(e) => setTab(e.target.value as TabId)}
+            aria-label="Filter queue by status"
+            className="w-full rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-3 text-sm font-semibold text-[var(--lv-ink)] shadow-inner outline-none ring-[var(--lv-accent)] focus:border-[var(--lv-primary)] focus:ring-2"
           >
-            {t.label}
-            {t.id !== "all" ? (
-              <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${tab === t.id ? "bg-white/20" : "bg-[var(--lv-surface)]"}`}>
-                {counts[t.id]}
-              </span>
-            ) : null}
-          </button>
-        ))}
+            {tabDefs.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+                {t.id !== "all" ? ` (${counts[t.id]})` : ` (${tasks.length})`}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <div className="hidden flex-wrap gap-1 sm:flex">
+          {tabDefs.map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              onClick={() => setTab(t.id)}
+              className={`shrink-0 rounded-full px-4 py-2.5 text-sm font-semibold transition min-h-11 sm:min-h-10 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--lv-primary)] ${
+                tab === t.id
+                  ? "bg-[var(--lv-primary)] text-white shadow-sm"
+                  : "border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 text-[var(--lv-ink)] hover:bg-[var(--lv-muted)]/70"
+              }`}
+            >
+              {t.label}
+              {t.id !== "all" ? (
+                <span className={`ml-1.5 rounded-full px-1.5 py-0.5 text-xs ${tab === t.id ? "bg-white/20" : "bg-[var(--lv-surface)]"}`}>
+                  {counts[t.id]}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
       </div>
 
       <ul className="mt-5 space-y-3">
