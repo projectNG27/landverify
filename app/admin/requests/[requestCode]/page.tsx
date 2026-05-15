@@ -5,6 +5,7 @@ import { Suspense } from "react";
 import { adminLogoutAction } from "@/app/actions/admin-auth";
 import { AdminAssignRequestForm } from "@/components/admin/AdminAssignRequestForm";
 import { AdminPaymentStatusForm } from "@/components/admin/AdminPaymentStatusForm";
+import { AdminRequestFinanceClient } from "@/components/admin/AdminRequestFinanceClient";
 import { AdminRequestMessageForm } from "@/components/admin/AdminRequestMessageForm";
 import { AdminRequesterReplyForm } from "@/components/admin/AdminRequesterReplyForm";
 import { AdminUpdateRequestStatusForm } from "@/components/admin/AdminUpdateRequestStatusForm";
@@ -17,6 +18,7 @@ import type { StoredAttachment } from "@/lib/request-document-storage";
 import { formatRemaining } from "@/lib/db/sla";
 import { formatNgnFromKobo } from "@/lib/pricing";
 import { paymentChannelLabel } from "@/lib/payment-display";
+import { getRequestEconomics, getTagIdsForRequest, listCaseTags, resolveRevenueKoboForRequest } from "@/lib/agent-wallet";
 import { getActiveAgentOptionsForRequest, getRequestDetailByCode } from "@/lib/db/manager-requests";
 
 export const metadata: Metadata = {
@@ -80,6 +82,14 @@ export default async function AdminRequestDetailPage({ params }: Props) {
   const pendingRequesterCase = caseMessages.filter(
     (m) => m.sender_role === "requester" && (m.status === "sent" || m.status === "read"),
   ).length;
+
+  const [allCaseTags, selectedTagIds, economics, revenuePreviewKobo] = await Promise.all([
+    listCaseTags(),
+    getTagIdsForRequest(requestId),
+    getRequestEconomics(requestId),
+    resolveRevenueKoboForRequest(requestId, r.product_id),
+  ]);
+  const assignedAgentId = (detail.request as { assigned_agent_id?: string | null }).assigned_agent_id ?? null;
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6 sm:py-14">
@@ -246,6 +256,16 @@ export default async function AdminRequestDetailPage({ params }: Props) {
               <p className="mt-2 text-xs text-[var(--lv-ink-faint)]">Signed links expire after about an hour.</p>
             </div>
           ) : null}
+
+          <AdminRequestFinanceClient
+            requestId={requestId}
+            requestCode={r.request_code}
+            tags={allCaseTags}
+            selectedTagIds={selectedTagIds}
+            economics={economics}
+            assignedAgentId={assignedAgentId}
+            revenuePreviewKobo={revenuePreviewKobo}
+          />
         </section>
 
         <aside className="space-y-4">

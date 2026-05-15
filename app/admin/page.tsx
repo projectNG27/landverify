@@ -33,6 +33,12 @@ export default async function AdminHomePage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
+            href="/admin/finance"
+            className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)]"
+          >
+            Finance
+          </Link>
+          <Link
             href="/admin/account"
             className="rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)]"
           >

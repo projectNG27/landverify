@@ -231,6 +231,13 @@ export async function agentUpdateProfileAction(
     return { error: "Select at least one state you can represent for LandVerify." };
   }
 
+  const payoutName = String(formData.get("payout_account_name") ?? "").trim();
+  const payoutBank = String(formData.get("payout_bank_name") ?? "").trim();
+  const payoutAcct = digitsOnly(String(formData.get("payout_account_number") ?? ""));
+  if (payoutAcct.length > 0 && payoutAcct.length < 10) {
+    return { error: "Account number should be at least 10 digits, or leave payout fields blank." };
+  }
+
   const supabase = getSupabaseAdminClient();
   const { error } = await supabase
     .from("agents")
@@ -239,6 +246,9 @@ export async function agentUpdateProfileAction(
       phone: phoneDigits,
       whatsapp_number: whatsappDigits,
       coverage_states,
+      payout_account_name: payoutName || null,
+      payout_bank_name: payoutBank || null,
+      payout_account_number: payoutAcct || null,
     })
     .eq("username", username.toLowerCase())
     .eq("is_active", true);

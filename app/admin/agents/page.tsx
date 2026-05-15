@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import { adminLogoutAction } from "@/app/actions/admin-auth";
 import { AdminCreateAgentForm } from "@/components/admin/AdminCreateAgentForm";
 import { AdminCreateAgentInviteForm } from "@/components/admin/AdminCreateAgentInviteForm";
+import { AdminAgentCommissionForm } from "@/components/admin/AdminAgentCommissionForm";
 import { AdminPendingInviteRow } from "@/components/admin/AdminPendingInviteRow";
 import { getAdminSessionUser } from "@/lib/admin-auth";
 import { listActiveAgents } from "@/lib/agent-auth";
@@ -57,6 +58,18 @@ export default async function AdminAgentsPage() {
         </form>
       </div>
 
+      <div className="mt-6 flex flex-wrap gap-3">
+        <Link
+          href="/admin/finance"
+          className="inline-flex min-h-11 items-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/30 px-4 text-sm font-semibold text-[var(--lv-primary)] hover:bg-[var(--lv-muted)]/50"
+        >
+          Finance & paystubs
+        </Link>
+        <Link href="/admin" className="inline-flex min-h-11 items-center text-sm font-semibold text-[var(--lv-primary)] hover:underline">
+          ← Dashboard
+        </Link>
+      </div>
+
       <div className="mt-6">
         <AdminCreateAgentInviteForm />
       </div>
@@ -87,12 +100,16 @@ export default async function AdminAgentsPage() {
 
       <section className="mt-6 rounded-2xl border border-[var(--lv-border)] bg-[var(--lv-surface)] p-5 shadow-sm">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Active agents</h2>
-        <ul className="mt-3 space-y-2">
+        <ul className="mt-3 space-y-3">
           {agents.map((a) => (
-            <li key={a.id} className="rounded-lg border border-[var(--lv-border)] px-3 py-2 text-sm">
-              <p className="font-semibold text-[var(--lv-ink)]">{a.full_name}</p>
-              <p className="text-[var(--lv-ink-faint)]">{a.username}</p>
-              <p className="mt-1 text-xs text-[var(--lv-ink-muted)]">
+            <li key={a.id}>
+              <AdminAgentCommissionForm
+                agentId={a.id}
+                fullName={a.full_name}
+                username={a.username}
+                commissionPercentBp={a.commission_percent_bp ?? 2500}
+              />
+              <p className="mt-2 px-1 text-xs text-[var(--lv-ink-muted)]">
                 Coverage: <span className="text-[var(--lv-ink)]">{formatCoverageStatesList(a.coverage_states)}</span>
               </p>
             </li>
@@ -100,12 +117,6 @@ export default async function AdminAgentsPage() {
           {agents.length === 0 ? <li className="text-sm text-[var(--lv-ink-faint)]">No agents created yet.</li> : null}
         </ul>
       </section>
-
-      <div className="mt-6">
-        <Link href="/admin" className="text-sm font-semibold text-[var(--lv-primary)] hover:underline">
-          ← Back to dashboard
-        </Link>
-      </div>
     </div>
   );
 }

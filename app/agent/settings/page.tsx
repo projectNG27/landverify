@@ -57,6 +57,9 @@ export default async function AgentSettingsPage() {
         initialPhone={phone}
         initialWhatsapp={whatsapp}
         initialCoverageStates={coverage}
+        initialPayoutAccountName={row.payout_account_name ?? ""}
+        initialPayoutBankName={row.payout_bank_name ?? ""}
+        initialPayoutAccountNumber={row.payout_account_number ?? ""}
       />
     </div>
   );

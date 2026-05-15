@@ -16,6 +16,10 @@ export type AgentRow = {
   agent_onboarding_policy_version: string | null;
   /** Set when the agent last opened `/agent` (queue). Used for “new since last visit”. */
   last_seen_at: string | null;
+  commission_percent_bp: number | null;
+  payout_account_name: string | null;
+  payout_bank_name: string | null;
+  payout_account_number: string | null;
 };
 
 export async function getAgentRowForSession(username: string): Promise<AgentRow | null> {
@@ -23,7 +27,7 @@ export async function getAgentRowForSession(username: string): Promise<AgentRow 
   const { data } = await supabase
     .from("agents")
     .select(
-      "id, full_name, username, email, phone, whatsapp_number, coverage_states, is_active, agent_onboarding_completed_at, agent_onboarding_policy_version, last_seen_at",
+      "id, full_name, username, email, phone, whatsapp_number, coverage_states, is_active, agent_onboarding_completed_at, agent_onboarding_policy_version, last_seen_at, commission_percent_bp, payout_account_name, payout_bank_name, payout_account_number",
     )
     .eq("username", username.toLowerCase())
     .maybeSingle();

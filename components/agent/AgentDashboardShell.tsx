@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
+import { formatNgnFromKobo } from "@/lib/pricing";
 
 export type AgentTaskVM = {
   request_code: string;
@@ -38,10 +39,13 @@ export function AgentDashboardShell({
   agentName,
   tasks,
   newSinceLastVisitCount,
+  pendingWalletKobo,
 }: {
   agentName: string;
   tasks: AgentTaskVM[];
   newSinceLastVisitCount: number;
+  /** Pending agent share (kobo); omit to hide wallet strip. */
+  pendingWalletKobo?: number;
 }) {
   const [tab, setTab] = useState<TabId>("new");
 
@@ -81,11 +85,20 @@ export function AgentDashboardShell({
           <p className="mt-1 text-sm text-[var(--lv-ink-muted)]">
             Signed in as <span className="font-medium text-[var(--lv-ink)]">{agentName}</span>
           </p>
-          <p className="mt-2">
+          {typeof pendingWalletKobo === "number" && pendingWalletKobo > 0 ? (
+            <p className="mt-2 rounded-lg bg-[var(--lv-primary)]/10 px-3 py-2 text-sm text-[var(--lv-ink)]">
+              <span className="text-[var(--lv-ink-muted)]">Pending wallet</span>{" "}
+              <span className="font-bold text-[var(--lv-primary)]">{formatNgnFromKobo(pendingWalletKobo)}</span>
+            </p>
+          ) : null}
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1">
+            <Link href="/agent/earnings" className="text-sm font-semibold text-[var(--lv-primary)] hover:underline">
+              Earnings
+            </Link>
             <Link href="/agent/settings" className="text-sm font-semibold text-[var(--lv-primary)] hover:underline">
               Account settings
             </Link>
-          </p>
+          </div>
         </div>
       </div>
 

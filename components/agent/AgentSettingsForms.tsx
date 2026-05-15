@@ -27,6 +27,9 @@ export function AgentSettingsForms({
   initialPhone,
   initialWhatsapp,
   initialCoverageStates,
+  initialPayoutAccountName,
+  initialPayoutBankName,
+  initialPayoutAccountNumber,
 }: {
   username: string;
   email: string;
@@ -34,6 +37,9 @@ export function AgentSettingsForms({
   initialPhone: string;
   initialWhatsapp: string;
   initialCoverageStates: string[];
+  initialPayoutAccountName: string;
+  initialPayoutBankName: string;
+  initialPayoutAccountNumber: string;
 }) {
   const [pwdState, pwdAction, pwdPending] = useActionState(agentChangePasswordAction, initialPwd);
   const [profileState, profileAction, profilePending] = useActionState(agentUpdateProfileAction, initialProfile);
@@ -42,6 +48,9 @@ export function AgentSettingsForms({
   const [phone, setPhone] = useState(initialPhone);
   const [whatsapp, setWhatsapp] = useState(initialWhatsapp);
   const [coverageStates, setCoverageStates] = useState<string[]>(initialCoverageStates);
+  const [payoutName, setPayoutName] = useState(initialPayoutAccountName);
+  const [payoutBank, setPayoutBank] = useState(initialPayoutBankName);
+  const [payoutAcct, setPayoutAcct] = useState(initialPayoutAccountNumber);
 
   const [newPassword, setNewPassword] = useState("");
   const [newPassword2, setNewPassword2] = useState("");
@@ -147,6 +156,55 @@ export function AgentSettingsForms({
             selectedStates={coverageStates}
             onSelectedStatesChange={setCoverageStates}
           />
+
+          <div className="rounded-xl border border-dashed border-[var(--lv-border)] bg-[var(--lv-muted)]/15 p-4">
+            <h3 className="text-sm font-semibold text-[var(--lv-ink)]">Payout bank (optional)</h3>
+            <p className="mt-1 text-xs text-[var(--lv-ink-muted)]">
+              Used when LandVerify pays you by transfer. You can leave blank and add later.
+            </p>
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+              <div className="sm:col-span-2">
+                <label htmlFor="settings_payout_name" className="text-xs font-medium text-[var(--lv-ink)]">
+                  Account name (as on bank)
+                </label>
+                <input
+                  id="settings_payout_name"
+                  name="payout_account_name"
+                  className={inputClass}
+                  autoComplete="name"
+                  value={payoutName}
+                  onChange={(e) => setPayoutName(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings_payout_bank" className="text-xs font-medium text-[var(--lv-ink)]">
+                  Bank name
+                </label>
+                <input
+                  id="settings_payout_bank"
+                  name="payout_bank_name"
+                  className={inputClass}
+                  value={payoutBank}
+                  onChange={(e) => setPayoutBank(e.target.value)}
+                />
+              </div>
+              <div>
+                <label htmlFor="settings_payout_acct" className="text-xs font-medium text-[var(--lv-ink)]">
+                  Account number
+                </label>
+                <input
+                  id="settings_payout_acct"
+                  name="payout_account_number"
+                  type="text"
+                  inputMode="numeric"
+                  className={inputClass}
+                  autoComplete="off"
+                  value={payoutAcct}
+                  onChange={(e) => setPayoutAcct(e.target.value)}
+                />
+              </div>
+            </div>
+          </div>
 
           <div>
             <label htmlFor="settings_profile_password" className="text-xs font-medium text-[var(--lv-ink)]">

@@ -73,6 +73,10 @@ create table if not exists public.agents (
   agent_onboarding_completed_at timestamptz,
   agent_onboarding_policy_version text,
   last_seen_at timestamptz,
+  commission_percent_bp int not null default 2500,
+  payout_account_name text,
+  payout_bank_name text,
+  payout_account_number text,
   created_at timestamptz not null default now()
 );
 
@@ -208,6 +212,68 @@ create table if not exists public.agent_response_attachments (
 create index if not exists agent_response_attachments_request_id_idx
   on public.agent_response_attachments (request_id, created_at desc);
 
+create table if not exists public.case_tags (
+  id uuid primary key default gen_random_uuid(),
+  slug text not null unique,
+  label text not null,
+  sort_order int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+insert into public.case_tags (slug, label, sort_order)
+values
+  ('rush', 'Rush', 10),
+  ('partner', 'Partner lead', 20),
+  ('vip', 'VIP / repeat', 30),
+  ('ministry', 'Ministry / official', 40)
+on conflict (slug) do nothing;
+
+create table if not exists public.request_case_tags (
+  request_id uuid not null references public.requests(id) on delete cascade,
+  tag_id uuid not null references public.case_tags(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (request_id, tag_id)
+);
+
+create index if not exists request_case_tags_tag_id_idx on public.request_case_tags (tag_id);
+
+create table if not exists public.agent_payout_batches (
+  id uuid primary key default gen_random_uuid(),
+  agent_id uuid not null references public.agents(id) on delete cascade,
+  period_year int not null,
+  period_month int not null check (period_month >= 1 and period_month <= 12),
+  total_kobo bigint not null check (total_kobo >= 0),
+  payment_reference text,
+  notes text,
+  created_by_admin text not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists agent_payout_batches_agent_period_idx
+  on public.agent_payout_batches (agent_id, period_year desc, period_month desc);
+
+create table if not exists public.agent_payout_batch_lines (
+  batch_id uuid not null references public.agent_payout_batches(id) on delete cascade,
+  request_id uuid not null references public.requests(id) on delete cascade,
+  agent_share_kobo bigint not null check (agent_share_kobo >= 0),
+  primary key (batch_id, request_id)
+);
+
+create table if not exists public.request_agent_economics (
+  id uuid primary key default gen_random_uuid(),
+  request_id uuid not null unique references public.requests(id) on delete cascade,
+  agent_id uuid not null references public.agents(id) on delete cascade,
+  revenue_kobo bigint not null check (revenue_kobo >= 0),
+  agent_percent_bp int not null check (agent_percent_bp >= 0 and agent_percent_bp <= 10000),
+  agent_share_kobo bigint not null check (agent_share_kobo >= 0),
+  finalized_at timestamptz not null default now(),
+  settled_at timestamptz,
+  payout_batch_id uuid references public.agent_payout_batches(id) on delete set null
+);
+
+create index if not exists request_agent_economics_agent_settled_idx
+  on public.request_agent_economics (agent_id, settled_at, finalized_at desc);
+
 create or replace function public.set_updated_at()
 returns trigger as $$
 begin
@@ -240,4 +306,9 @@ alter table public.agent_findings disable row level security;
 alter table public.agent_response_attachments disable row level security;
 alter table public.agent_security_tokens disable row level security;
 alter table public.agent_invites disable row level security;
+alter table public.case_tags disable row level security;
+alter table public.request_case_tags disable row level security;
+alter table public.agent_payout_batches disable row level security;
+alter table public.agent_payout_batch_lines disable row level security;
+alter table public.request_agent_economics disable row level security;
 

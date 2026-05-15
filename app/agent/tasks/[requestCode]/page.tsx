@@ -10,6 +10,8 @@ import { AgentTaskLocationBlock } from "@/components/agent/AgentTaskLocationBloc
 import { RequestAttachmentDownloads } from "@/components/shared/RequestAttachmentDownloads";
 import { getAgentSessionUser } from "@/lib/admin-auth";
 import { agentNeedsOnboarding, getAgentRowForSession } from "@/lib/agent-profile";
+import { formatNgnFromKobo } from "@/lib/pricing";
+import { getAgentPendingWalletKobo, getRequestEconomics } from "@/lib/agent-wallet";
 import { formatRemaining } from "@/lib/db/sla";
 import { normalizeDocumentNames } from "@/lib/document-names";
 import { siteBaseUrl } from "@/lib/agent-invite";
@@ -94,6 +96,11 @@ export default async function AgentTaskPage({ params }: Props) {
 
   const taskAbsoluteUrl = `${siteBaseUrl()}/agent/tasks/${encodeURIComponent(requestCode)}`;
 
+  const [pendingWalletKobo, taskEconomics] = await Promise.all([
+    getAgentPendingWalletKobo(row.id),
+    getRequestEconomics(String(request.id)),
+  ]);
+
   return (
     <div className="mx-auto max-w-lg px-4 pb-28 pt-6 sm:max-w-5xl sm:px-6 sm:pb-14 sm:pt-10">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -108,8 +115,22 @@ export default async function AgentTaskPage({ params }: Props) {
           <p className={`mt-2 text-sm ${remain.urgent ? "font-semibold text-red-600" : "text-[var(--lv-ink-faint)]"}`}>
             {remain.text}
           </p>
+          {pendingWalletKobo > 0 ? (
+            <p className="mt-2 text-xs text-[var(--lv-ink-muted)]">
+              Your overall pending wallet:{" "}
+              <Link href="/agent/earnings" className="font-semibold text-[var(--lv-primary)] hover:underline">
+                {formatNgnFromKobo(pendingWalletKobo)}
+              </Link>
+            </p>
+          ) : null}
         </div>
         <div className="flex shrink-0 gap-2">
+          <Link
+            href="/agent/earnings"
+            className="hidden rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)] sm:inline-flex sm:items-center"
+          >
+            Earnings
+          </Link>
           <Link
             href="/agent/settings"
             className="hidden rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2 text-sm font-medium text-[var(--lv-ink-muted)] hover:text-[var(--lv-ink)] sm:inline-flex sm:items-center"
@@ -128,6 +149,24 @@ export default async function AgentTaskPage({ params }: Props) {
       </div>
 
       <div className="mt-6 space-y-6">
+        {taskEconomics ? (
+          <div
+            className={`rounded-2xl border p-4 shadow-sm sm:p-5 ${
+              taskEconomics.settled_at
+                ? "border-[var(--lv-border)] bg-[var(--lv-muted)]/20"
+                : "border-[var(--lv-primary)]/40 bg-[var(--lv-primary)]/5"
+            }`}
+          >
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--lv-ink-faint)]">Your share · this case</p>
+            <p className="mt-2 text-lg font-bold text-[var(--lv-ink)]">{formatNgnFromKobo(taskEconomics.agent_share_kobo)}</p>
+            <p className="mt-1 text-xs text-[var(--lv-ink-muted)]">
+              Case revenue recorded: {formatNgnFromKobo(taskEconomics.revenue_kobo)} · Commission{" "}
+              {(taskEconomics.agent_percent_bp / 100).toFixed(2)}%
+              {taskEconomics.settled_at ? " · Settled (paid or batched)" : " · Pending in your wallet"}
+            </p>
+          </div>
+        ) : null}
+
         <AgentCasePackPanel
           taskAbsoluteUrl={taskAbsoluteUrl}
           requestCode={String(request.request_code)}
@@ -243,23 +282,29 @@ export default async function AgentTaskPage({ params }: Props) {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-[var(--lv-border)] bg-[var(--lv-surface)]/95 p-3 backdrop-blur-md sm:hidden">
-        <div className="mx-auto flex max-w-lg gap-2">
+        <div className="mx-auto grid max-w-lg grid-cols-2 gap-2">
           <Link
             href="/agent"
-            className="flex flex-1 min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 text-sm font-semibold text-[var(--lv-ink)]"
+            className="flex min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 text-sm font-semibold text-[var(--lv-ink)]"
           >
             Queue
           </Link>
           <Link
+            href="/agent/earnings"
+            className="flex min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-muted)]/40 text-sm font-semibold text-[var(--lv-ink)]"
+          >
+            Earnings
+          </Link>
+          <Link
             href="/agent/settings"
-            className="flex flex-1 min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] text-sm font-semibold text-[var(--lv-ink)]"
+            className="flex min-h-12 items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] text-sm font-semibold text-[var(--lv-ink)]"
           >
             Account
           </Link>
-          <form action={agentLogoutAction} className="flex-1">
+          <form action={agentLogoutAction} className="min-h-0">
             <button
               type="submit"
-              className="w-full min-h-12 rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] text-sm font-semibold text-[var(--lv-ink-muted)]"
+              className="flex h-full min-h-12 w-full items-center justify-center rounded-xl border border-[var(--lv-border)] bg-[var(--lv-surface)] text-sm font-semibold text-[var(--lv-ink-muted)]"
             >
               Sign out
             </button>

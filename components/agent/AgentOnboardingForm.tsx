@@ -8,6 +8,9 @@ const initialState: AgentOnboardingState = { ok: true };
 const inputClass =
   "mt-2 h-4 w-4 shrink-0 rounded border-[var(--lv-border)] text-[var(--lv-primary)] focus:ring-[var(--lv-primary)]";
 
+const textInputClass =
+  "mt-1 w-full rounded-lg border border-[var(--lv-border)] bg-[var(--lv-surface)] px-3 py-2.5 text-sm text-[var(--lv-ink)] shadow-inner outline-none focus:border-[var(--lv-primary)] focus:ring-2";
+
 export function AgentOnboardingForm({ nextPath }: { nextPath: string }) {
   const [state, action, pending] = useActionState(completeAgentOnboardingAction, initialState);
 
@@ -58,6 +61,33 @@ export function AgentOnboardingForm({ nextPath }: { nextPath: string }) {
             <strong>being banned</strong> from the agent platform.
           </span>
         </label>
+      </div>
+
+      <div className="rounded-xl border border-dashed border-[var(--lv-border)] bg-[var(--lv-muted)]/15 p-4">
+        <h3 className="text-sm font-semibold text-[var(--lv-ink)]">Payout bank (optional)</h3>
+        <p className="mt-1 text-xs text-[var(--lv-ink-muted)]">
+          Add now or later under Account. Used for direct transfers from LandVerify.
+        </p>
+        <div className="mt-3 space-y-3">
+          <div>
+            <label htmlFor="onb_payout_name" className="text-xs font-medium text-[var(--lv-ink)]">
+              Account name
+            </label>
+            <input id="onb_payout_name" name="payout_account_name" className={textInputClass} autoComplete="name" />
+          </div>
+          <div>
+            <label htmlFor="onb_payout_bank" className="text-xs font-medium text-[var(--lv-ink)]">
+              Bank name
+            </label>
+            <input id="onb_payout_bank" name="payout_bank_name" className={textInputClass} />
+          </div>
+          <div>
+            <label htmlFor="onb_payout_acct" className="text-xs font-medium text-[var(--lv-ink)]">
+              Account number
+            </label>
+            <input id="onb_payout_acct" name="payout_account_number" className={textInputClass} inputMode="numeric" />
+          </div>
+        </div>
       </div>
 
       {state.ok === false && state.error ? (

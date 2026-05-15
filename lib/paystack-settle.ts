@@ -9,7 +9,10 @@ function revalidatePaymentSurfaces(requestCode: string | null) {
     "/pay/callback",
     "/submit-request",
     "/admin",
+    "/admin/finance",
     "/admin/requests",
+    "/agent",
+    "/agent/earnings",
     ...(requestCode ? [`/admin/requests/${requestCode}`] : []),
   ];
   for (const p of paths) {

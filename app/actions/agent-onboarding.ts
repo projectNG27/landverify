@@ -25,11 +25,25 @@ export async function completeAgentOnboardingAction(_: AgentOnboardingState, for
   if (!row.is_active) return { ok: false, error: "This account is not active. Contact your manager." };
 
   const now = new Date().toISOString();
+  const payoutName = String(formData.get("payout_account_name") ?? "").trim();
+  const payoutBank = String(formData.get("payout_bank_name") ?? "").trim();
+  const payoutAcct = String(formData.get("payout_account_number") ?? "").replace(/\D/g, "");
+  if (payoutAcct.length > 0 && payoutAcct.length < 10) {
+    return { ok: false, error: "If you enter an account number, use at least 10 digits (or leave payout fields blank)." };
+  }
+
   const { error } = await supabase
     .from("agents")
     .update({
       agent_onboarding_completed_at: now,
       agent_onboarding_policy_version: CURRENT_AGENT_ONBOARDING_POLICY,
+      ...(payoutName || payoutBank || payoutAcct
+        ? {
+            payout_account_name: payoutName || null,
+            payout_bank_name: payoutBank || null,
+            payout_account_number: payoutAcct || null,
+          }
+        : {}),
     })
     .eq("id", row.id);
 
@@ -40,6 +54,8 @@ export async function completeAgentOnboardingAction(_: AgentOnboardingState, for
 
   revalidatePath("/agent");
   revalidatePath("/agent/onboarding");
+  revalidatePath("/agent/earnings");
+  revalidatePath("/agent/settings");
 
   const next = String(formData.get("next") ?? "").trim();
   if (next.startsWith("/") && !next.startsWith("//") && next.startsWith("/agent")) {
